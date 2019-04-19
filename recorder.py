@@ -60,15 +60,15 @@ class InputRecorder:
         self.t.start()
 
     ### MATH ###
-            
-    def downsample(self, data, mult):
-        """Given 1D data, return the binned average."""
-        overhang = len(data) % mult
-        if overhang:
-            data = data[:-overhang]
-        data = numpy.reshape(data, (len(data) / mult, mult))
-        data = numpy.average(data, 1)
-        return data    
+
+    # def downsample(self, data, mult):
+    #     """Given 1D data, return the binned average."""
+    #     overhang = len(data) % mult
+    #     if overhang:
+    #         data = data[:-overhang]
+    #     data = numpy.reshape(data, (len(data) / mult, mult))
+    #     data = numpy.average(data, 1)
+    #     return data
         
     def fft(self, data=None, trim_by=10, log_scale=False, div_by=100):
         if not data: 
@@ -85,10 +85,3 @@ class InputRecorder:
         if div_by:
             ys = ys / float(div_by)
         return xs, ys
-    
-    ### VISUALIZATION ###
-    
-    def plot_sound_wave(self):
-        """open a matplotlib popup window showing audio data."""
-        pylab.plot(self.audio.flatten())
-        pylab.show()
