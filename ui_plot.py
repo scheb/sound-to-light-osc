@@ -14,32 +14,31 @@ try:
 except AttributeError:
     _fromUtf8 = lambda s: s
 
-class Ui_win_plot(object):
-    def setupUi(self, win_plot):
+
+class UserInterface(object):
+    def setupUi(self, win_plot, on_beat_button_click, on_bar_button_click):
         win_plot.setObjectName(_fromUtf8("win_plot"))
         win_plot.resize(300, 80)
         self.centralwidget = QtGui.QWidget(win_plot)
         self.verticalLayout = QtGui.QVBoxLayout(self.centralwidget)
-        self.bpmButton = QtGui.QPushButton(self.centralwidget)
-        self.bpmButton.setObjectName(_fromUtf8("btnD"))
-        self.bpmButton.setStyleSheet("background-color: red")
-        self.verticalLayout.addWidget(self.bpmButton)
+
+        self.beatButton = QtGui.QPushButton(self.centralwidget)
+        self.beatButton.setObjectName(_fromUtf8("btnBeat"))
+        self.beatButton.setStyleSheet("background-color: red; font-size: 18pt")
+        self.beatButton.clicked.connect(on_beat_button_click)
+        self.verticalLayout.addWidget(self.beatButton)
+
+        self.barButton = QtGui.QPushButton(self.centralwidget)
+        self.barButton.setObjectName(_fromUtf8("btnBar"))
+        self.barButton.setStyleSheet("background-color: red; font-size: 18pt")
+        self.barButton.clicked.connect(on_bar_button_click)
+        self.verticalLayout.addWidget(self.barButton)
+
         win_plot.setCentralWidget(self.centralwidget)
         self.retranslateUi(win_plot)
         QtCore.QMetaObject.connectSlotsByName(win_plot)
 
     def retranslateUi(self, win_plot):
         win_plot.setWindowTitle(QtGui.QApplication.translate("win_plot", "Beat Detector", None, QtGui.QApplication.UnicodeUTF8))
-        self.bpmButton.setText(QtGui.QApplication.translate("win_plot", "BPM", None, QtGui.QApplication.UnicodeUTF8))
-
-from PyQt4 import Qwt5
-
-if __name__ == "__main__":
-    import sys
-    app = QtGui.QApplication(sys.argv)
-    win_plot = QtGui.QMainWindow()
-    ui = Ui_win_plot()
-    ui.setupUi(win_plot)
-    win_plot.show()
-    sys.exit(app.exec_())
-
+        self.beatButton.setText(QtGui.QApplication.translate("win_plot", "Beat", None, QtGui.QApplication.UnicodeUTF8))
+        self.barButton.setText(QtGui.QApplication.translate("win_plot", "BPM", None, QtGui.QApplication.UnicodeUTF8))
