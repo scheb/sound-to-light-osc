@@ -1,10 +1,8 @@
 import matplotlib
 matplotlib.use('TkAgg') # <-- THIS MAKES IT FAST!
 import numpy
-import scipy
 import pyaudio
 import threading
-import pylab
 
 class InputRecorder:
     """Simple, cross-platform class to record from the default input device."""
