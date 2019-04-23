@@ -16,7 +16,7 @@ except AttributeError:
 
 
 class UserInterface(object):
-    def setupUi(self, win_plot, on_beat_button_click, on_bar_button_click):
+    def setupUi(self, win_plot):
         win_plot.setObjectName(_fromUtf8("win_plot"))
         win_plot.resize(300, 80)
         self.centralwidget = QtGui.QWidget(win_plot)
@@ -25,13 +25,11 @@ class UserInterface(object):
         self.beatButton = QtGui.QPushButton(self.centralwidget)
         self.beatButton.setObjectName(_fromUtf8("btnBeat"))
         self.beatButton.setStyleSheet("background-color: red; font-size: 18pt")
-        self.beatButton.clicked.connect(on_beat_button_click)
         self.verticalLayout.addWidget(self.beatButton)
 
         self.barButton = QtGui.QPushButton(self.centralwidget)
         self.barButton.setObjectName(_fromUtf8("btnBar"))
         self.barButton.setStyleSheet("background-color: red; font-size: 18pt")
-        self.barButton.clicked.connect(on_bar_button_click)
         self.verticalLayout.addWidget(self.barButton)
 
         win_plot.setCentralWidget(self.centralwidget)
