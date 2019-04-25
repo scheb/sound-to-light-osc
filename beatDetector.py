@@ -10,11 +10,12 @@ class BeatDetector:
     ui: ui.UserInterface
     osc_client: osc.OscClient
     input_recorder: InputRecorder
-    timer_period = 50.0
+    timer_period = 16.3333333
     bar_modulo = 8
 
-    def __init__(self, ui) -> None:
-        self.ui = ui
+    def __init__(self, window) -> None:
+        self.ui = ui.UserInterface()
+        self.ui.setup_ui(window)
         self.osc_client = osc.OscClient("localhost", 7701)
 
         # Wire up beat detector and signal generation
@@ -62,11 +63,9 @@ if __name__ == "__main__":
     # Setup UI
     app = QtGui.QApplication(sys.argv)
     window = ui.QtGui.QMainWindow()
-    ui = ui.UserInterface()
-    ui.setup_ui(window)
 
     # Start beat tracking
-    beat_detector = BeatDetector(ui)
+    beat_detector = BeatDetector(window)
 
     # Display window
     window.show()
