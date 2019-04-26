@@ -24,8 +24,8 @@ Automatically listens to default audio input device.
 
 OSC signals are sent to `localhost:7701`, can be changed in `beatDetector.py`.
 
-- `/beat` is sent each time a beat is detected. Ideal for fast light change.
-- `/bar` is sent every 8 beats. Ideal for less frequent light change.
+- `/beat` is sent for every beat detected, or every 2nd beat when auto generating beats. Ideal for fast light change.
+- `/bar` is sent every 16 beats. Ideal for less frequent light change.
 
 ## Acknowledgments
 

@@ -52,7 +52,7 @@ class UserInterface(object):
         self.beat_button.setText(_fromUtf8("Beat: {:d}".format(beat_index)))
 
     def display_bpm(self, bpm):
-        self.bar_button.setText(_fromUtf8("BPM: {:d}".format(bpm)))
+        self.bar_button.setText(_fromUtf8("BPM: {:d}".format(int(bpm))))
 
     def display_new_song(self):
         self.beat_button.setText(_fromUtf8("Beat"))
