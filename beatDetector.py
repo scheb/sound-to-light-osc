@@ -10,7 +10,7 @@ class BeatDetector:
     ui: ui.UserInterface
     osc_client: osc.OscClient
     input_recorder: InputRecorder
-    timer_period = 16.66666
+    timer_period = 1000 / (180 / 60) / 32  # 180bpm / 8
     bar_modulo = 8
 
     def __init__(self, window) -> None:
