@@ -113,7 +113,7 @@ class AudioAnalyzer:
             self.bpm_history = self.bpm_history[8:]
 
     def detect_beat(self, time_since_last_beat):
-        # print("beat detected")
+        print("Detected: Beat")
         bpm_detected = 60 / time_since_last_beat
         if len(self.bpm_history) < 8:
             if bpm_detected > self.min_bpm:
@@ -136,12 +136,12 @@ class AudioAnalyzer:
         return data[abs(data - numpy.mean(data)) < m * numpy.std(data)]
 
     def detect_new_song(self):
-        # print("detect new song")
+        print("Detected: New song")
         self.reset_tracking()
         self.callback_new_song()
 
     def detect_pause(self):
-        # print("detect pause")
+        print("Detected: Pause")
         self.callback_pause()
 
     def on_beat_detected(self, callback):
@@ -250,14 +250,17 @@ class SignalGenerator:
 
     def track_pause(self):
         print("Pause")
-        self.timer.stop()
+        if hasattr(self, 'timer'):
+            self.timer.stop()
         self.auto_generating = False
         self.reset_beat_index()
 
     def on_beat(self, callback):
+        print("Beat detected")
         self.callback_beat = callback
 
     def on_bar(self, callback):
+        print("Pause")
         self.callback_bar = callback
 
     def on_new_song(self, callback):
