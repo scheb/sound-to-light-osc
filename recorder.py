@@ -57,7 +57,7 @@ class InputRecorder:
         self.t = threading.Thread(target=self.record)
         self.t.start()
 
-    def fft(self, data=None, trim_by=1, log_scale=False, div_by=100):
+    def fft(self, data=None, trim_by=2, log_scale=False, div_by=100):
         if not data: 
             data = self.audio.flatten()
         left, right = numpy.split(numpy.abs(numpy.fft.fft(data)), 2)

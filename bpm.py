@@ -8,8 +8,8 @@ class AudioAnalyzer:
     max_bpm = 180
     bpm_history_length = 16  # beats
     freq_history_length = 24  # samples
-    intensity_history_length = 64  # samples
-    volume_history_length = 600  # seconds
+    intensity_history_length = 128  # samples
+    volume_history_length = 3*60  # seconds
     input_recorder: InputRecorder
 
     # Timing
@@ -26,8 +26,8 @@ class AudioAnalyzer:
     max_volume = 1000  # Recent max volume
     current_intensity: int
     intensity_history: list
-    y_history: list
-    volume_history: list
+    y_max_history: list
+    volume_long_history: list
     low_history: list
     bass_history: list
     low_midrange_history: list
@@ -35,24 +35,25 @@ class AudioAnalyzer:
 
     def __init__(self, input_recorder):
         self.input_recorder = input_recorder
+        self.current_intensity = 0
         self.reset_tracking()
         self.callback_beat_detected = lambda: None
         self.callback_new_song = lambda: None
         self.callback_pause = lambda: None
         self.callback_intensity_changed = lambda: None
         self.prev_volume_track_time = 0
-        self.volume_history = []
+        self.volume_long_history = []
 
     def reset_tracking(self):
         self.current_bpm = 0
         self.prev_beat_time = perf_counter()
         self.bpm_history = []
-        self.y_history = []
+        self.y_max_history = []
         self.low_history = []
         self.bass_history = []
         self.low_midrange_history = []
         self.low_avg_time = -1
-        self.current_intensity = 0
+        self.change_intensity(0)
         self.intensity_history = []
 
     def analyze_audio(self):
@@ -63,17 +64,27 @@ class AudioAnalyzer:
 
         # Get x and y values from FFT
         xs, ys = self.input_recorder.fft()
+        # print("max hz", numpy.max(xs))
 
-        # Calculate average for all frequency ranges
-        y_avg = numpy.mean(ys)
-        self.y_history.append(y_avg)
+        intensity_samples = ys # [ys[i] for i in range(len(xs)) if 60 <= xs[i] <= 1000]
 
         # Keep track of volume
-        self.track_max_volume(y_avg)
+        # y_max = numpy.percentile(ys, 90)
+        y_max = numpy.percentile(intensity_samples, 55)
+        self.track_max_volume(y_max)
+
+        # Evaluate the intensity
+        # intensity_samples = [ys[i] for i in range(len(xs)) if 60 <= xs[i] <= 4000]
+        # intensity_level = numpy.mean(intensity_samples)
+
+        # print(y_max, intensity_level)
+
+        # intensity_samples = [ys[i] for i in range(len(xs)) if 60 <= xs[i] <= 4000]
+
+        y_avg = numpy.percentile(intensity_samples, 50)
         self.track_intensity(y_avg)
 
-        # Otherwise do normal beat detection
-        if not self.track_low_intensity(y_avg):
+        if not self.track_low_volume(y_avg):
             # Calculate frequency average
             low_samples = [ys[i] for i in range(len(xs)) if xs[i] <= 1000]  # Overall low frequencies
             low = numpy.mean(low_samples)
@@ -118,19 +129,23 @@ class AudioAnalyzer:
 
         self.housekeeping()
 
-    def track_max_volume(self, y_avg):
-        if self.current_time > self.prev_volume_track_time + 1 and len(self.y_history):
+    def track_max_volume(self, level):
+        self.y_max_history.append(level)
+        if self.current_time > self.prev_volume_track_time + 1:
             self.prev_volume_track_time = self.current_time
-            self.volume_history.append(numpy.max(self.y_history))
-            if len(self.volume_history) > self.volume_history_length:
-                self.volume_history = self.volume_history[1:]
-            self.max_volume = numpy.max(self.volume_history)
+            self.volume_long_history.append(numpy.percentile(self.y_max_history, 95))
+            if len(self.volume_long_history) > self.volume_history_length:
+                self.volume_long_history = self.volume_long_history[1:]
+            self.max_volume = numpy.percentile(self.volume_long_history, 95)
 
     def track_intensity(self, level):
         self.intensity_history.append(level / self.max_volume)
-        avg = numpy.average(self.intensity_history)
         if len(self.intensity_history) < self.intensity_history_length / 2:
             return
+
+        avg = numpy.average(self.intensity_history)
+        # print(self.intensity_history)
+        # print(avg, self.max_volume)
 
         # Make it harder to switch intensity
         resistance_to_intense = +0.07
@@ -149,13 +164,14 @@ class AudioAnalyzer:
         else:  # Calm
             intensity = -1
 
-        # print(self.intensity_history)
-        # print(avg)
+        self.change_intensity(intensity)
+
+    def change_intensity(self, intensity):
         if intensity != self.current_intensity:
             self.current_intensity = intensity
             self.detect_intensity_changed(self.current_intensity)
 
-    def track_low_intensity(self, y_avg):
+    def track_low_volume(self, y_avg):
         # Detect very low volume (to detect new track)
         if y_avg < self.max_volume * 0.05:
             if self.low_avg_time == -1:
@@ -184,8 +200,8 @@ class AudioAnalyzer:
             self.bass_history = self.bass_history[1:]
         if len(self.low_midrange_history) > self.freq_history_length:
             self.low_midrange_history = self.low_midrange_history[1:]
-        if len(self.y_history) > self.freq_history_length:
-            self.y_history = self.y_history[1:]
+        if len(self.y_max_history) > self.freq_history_length:
+            self.y_max_history = self.y_max_history[1:]
         if len(self.intensity_history) > self.intensity_history_length:
             self.intensity_history = self.intensity_history[1:]
 
