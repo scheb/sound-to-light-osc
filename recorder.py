@@ -9,7 +9,7 @@ class InputRecorder:
     
     def __init__(self):
         self.RATE = 44100
-        self.BUFFERSIZE = 2**12
+        self.BUFFERSIZE = 2**10
         self.secToRecord = .1
         self.kill_threads = False
         self.has_new_audio = False
@@ -57,7 +57,7 @@ class InputRecorder:
         self.t = threading.Thread(target=self.record)
         self.t.start()
 
-    def fft(self, data=None, trim_by=10, log_scale=False, div_by=100):
+    def fft(self, data=None, trim_by=1, log_scale=False, div_by=100):
         if not data: 
             data = self.audio.flatten()
         left, right = numpy.split(numpy.abs(numpy.fft.fft(data)), 2)

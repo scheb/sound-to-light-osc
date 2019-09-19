@@ -10,8 +10,7 @@ class BeatDetector:
     ui: ui.UserInterface
     osc_client: osc.OscClient
     input_recorder: InputRecorder
-    timer_period = 1000 / (180 / 60) / 32  # 180bpm / 8
-    bar_modulo = 8
+    timer_period = 1000 / (180 / 60) / 16  # 180bpm / 16
 
     def __init__(self, window) -> None:
         self.ui = ui.UserInterface(self.on_auto_prog_button_clicked)
@@ -22,13 +21,14 @@ class BeatDetector:
         # Wire up beat detector and signal generation
         self.input_recorder = InputRecorder()
         self.audio_analyzer = AudioAnalyzer(self.input_recorder)
-        signal_generator = SignalGenerator(self.audio_analyzer, self.bar_modulo)
+        signal_generator = SignalGenerator(self.audio_analyzer)
 
         # Wire up callbacks
         signal_generator.on_beat(self.on_beat)
         signal_generator.on_bar(self.on_bar)
         signal_generator.on_new_song(self.on_new_song)
         signal_generator.on_bpm_change(self.on_bpm_change)
+        signal_generator.on_intensity_change(self.on_intensity_change)
 
         # Start beat detection
         self.timer = QtCore.QTimer()
@@ -59,6 +59,9 @@ class BeatDetector:
     def on_bpm_change(self, bpm):
         # print("bpm changed")
         self.ui.display_bpm(bpm)
+
+    def on_intensity_change(self, intensity):
+        self.ui.display_intensity(intensity)
 
     def close(self):
         self.input_recorder.close()

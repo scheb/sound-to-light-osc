@@ -1,10 +1,12 @@
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtGui import QPushButton
+from PyQt4.QtGui import QPushButton, QLabel
+
 
 class UserInterface(object):
     auto_prog_button: QPushButton
-    beat_button: QPushButton
-    bar_button: QPushButton
+    intensity_label: QLabel
+    beat_label: QLabel
+    bar_label: QLabel
     colorsList = ["#a9a9a9", "#f58231", "#ffe119", "#bfef45", "#3cb44b", "#42d4f4", "#4363d8", "#f032e6"]
     beat_color_index = 0
     bar_color_index = 0
@@ -24,15 +26,20 @@ class UserInterface(object):
         self.auto_prog_button.clicked.connect(self.callback_auto_prog_clicked)
         vertical_layout.addWidget(self.auto_prog_button)
 
-        self.beat_button = QtGui.QPushButton(central_widget)
-        self.beat_button.setObjectName("btn_beat")
-        self.beat_button.setStyleSheet("background-color: red; font-size: 18pt")
-        vertical_layout.addWidget(self.beat_button)
+        self.intensity_label = QtGui.QLabel(central_widget)
+        self.intensity_label.setObjectName("lbl_intensity")
+        self.intensity_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
+        vertical_layout.addWidget(self.intensity_label)
 
-        self.bar_button = QtGui.QPushButton(central_widget)
-        self.bar_button.setObjectName("btn_bar")
-        self.bar_button.setStyleSheet("background-color: red; font-size: 18pt")
-        vertical_layout.addWidget(self.bar_button)
+        self.beat_label = QtGui.QLabel(central_widget)
+        self.beat_label.setObjectName("lbl_beat")
+        self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
+        vertical_layout.addWidget(self.beat_label)
+
+        self.bar_label = QtGui.QLabel(central_widget)
+        self.bar_label.setObjectName("lbl_bar")
+        self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
+        vertical_layout.addWidget(self.bar_label)
 
         win_plot.setCentralWidget(central_widget)
         self.translate_ui(win_plot)
@@ -41,8 +48,9 @@ class UserInterface(object):
     def translate_ui(self, win_plot):
         win_plot.setWindowTitle(QtGui.QApplication.translate("win_plot", "Beat Detector", None, QtGui.QApplication.UnicodeUTF8))
         self.auto_prog_button.setText(QtGui.QApplication.translate("win_plot", "Auto Prog OFF", None, QtGui.QApplication.UnicodeUTF8))
-        self.beat_button.setText(QtGui.QApplication.translate("win_plot", "Beat", None, QtGui.QApplication.UnicodeUTF8))
-        self.bar_button.setText(QtGui.QApplication.translate("win_plot", "BPM", None, QtGui.QApplication.UnicodeUTF8))
+        self.intensity_label.setText(QtGui.QApplication.translate("win_plot", "Intensity", None, QtGui.QApplication.UnicodeUTF8))
+        self.beat_label.setText(QtGui.QApplication.translate("win_plot", "Beat", None, QtGui.QApplication.UnicodeUTF8))
+        self.bar_label.setText(QtGui.QApplication.translate("win_plot", "BPM", None, QtGui.QApplication.UnicodeUTF8))
 
     def change_auto_prog_state(self, enabled):
         if enabled:
@@ -55,19 +63,28 @@ class UserInterface(object):
     def change_beat_button_color(self):
         self.beat_color_index += 1
         color = self.colorsList[self.beat_color_index % len(self.colorsList)]
-        self.beat_button.setStyleSheet("background-color: {:s}; font-size: 18pt".format(color))
+        self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: {:s}; font-size: 18pt".format(color))
 
     def change_bar_button_color(self):
         self.bar_color_index += 1
         color = self.colorsList[self.bar_color_index % len(self.colorsList)]
-        self.bar_button.setStyleSheet("background-color: {:s}; font-size: 18pt".format(color))
+        self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: {:s}; font-size: 18pt".format(color))
+
+    def display_intensity(self, intensity):
+        if intensity == 1:
+            intensity_label = "Intense"
+        elif intensity == 0:
+            intensity_label = "Normal"
+        else:
+            intensity_label = "Calm"
+        self.intensity_label.setText(intensity_label)
 
     def display_beat_index(self, beat_index):
-        self.beat_button.setText("Beat: {:d}".format(beat_index))
+        self.beat_label.setText("Beat: {:d}".format(beat_index))
 
     def display_bpm(self, bpm):
-        self.bar_button.setText("BPM: {:d}".format(int(bpm)))
+        self.bar_label.setText("BPM: {:d}".format(int(bpm)))
 
     def display_new_song(self):
-        self.beat_button.setText("Beat")
-        self.bar_button.setText("BPM: New song")
+        self.beat_label.setText("Beat")
+        self.bar_label.setText("BPM: New song")
