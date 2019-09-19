@@ -14,7 +14,9 @@ class BeatDetector:
     input_recorder: InputRecorder
     timer_period = 1000 / (180 / 60) / 16  # 180bpm / 16
 
+    min_program_beats = 8
     max_program_beats = 8 * 4
+
     current_intensity = 0
     current_program = 0
     current_program_beats = 0
@@ -60,13 +62,13 @@ class BeatDetector:
         self.input_recorder.start()
 
     def change_program_if_needed(self):
-        if self.change_program:
+        if self.change_program and self.current_program_beats >= self.min_program_beats:
             new_program = self.choose_program_by_intensity()
             if new_program != self.current_program:
                 print("Change program to {:d} for intensity {:d}".format(new_program, self.current_intensity))
                 self.current_program = new_program
                 self.osc_client.send_prog_signal(new_program)
-            self.current_program_beats = 0
+            self.current_program_beats = 1
             self.change_program = False
 
     def choose_program_by_intensity(self):
