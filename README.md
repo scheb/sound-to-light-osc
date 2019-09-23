@@ -7,6 +7,8 @@ It keeps track of the music "intensity" (calm, normal, intense) to switch lighti
 
 I use [QLC+](https://github.com/mcallegari/qlcplus) for DMX control.
 
+![Video](video.gif)
+
 ## Required modules
 
 - PyAudio
