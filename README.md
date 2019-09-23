@@ -3,6 +3,8 @@
 Real-time detection of beats for audio from an input device (typically "Stereo Mix"). Outputs OSC signals, which can be
 used for sound-to-light control.
 
+It keeps track of the music "intensity" (calm, normal, intense) to switch lighting programs.
+
 I use [QLC+](https://github.com/mcallegari/qlcplus) for DMX control.
 
 ## Required modules
@@ -24,8 +26,9 @@ Automatically listens to default audio input device.
 
 OSC signals are sent to `localhost:7701`, can be changed in `beatDetector.py`.
 
-- `/beat` is sent for every beat detected, or every 2nd beat when auto generating beats. Ideal for fast light change.
-- `/bar` is sent every 16 beats. Ideal for less frequent light change.
+- `/beat` is sent for every beat detected.
+- `/bar` is sent every to change the lighting scene.
+- `/prog1` - `/prog8` is sent to change lighting programs (available have to be configured in `beatDetector.py`)
 
 ## Acknowledgments
 
