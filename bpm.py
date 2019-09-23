@@ -305,11 +305,11 @@ class SignalGenerator:
 
     def recalculate_bar_modulo(self):
         # Bar modulo based on intensity
-        modulo = 4
+        modulo = 2
         if self.intensity == 1:
             modulo = 1
         if self.intensity == -1:
-            modulo = 8
+            modulo = 4
 
         # Additional modifier based in BPM
         if self.bpm > 0:
