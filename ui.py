@@ -1,5 +1,5 @@
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtGui import QPushButton, QLabel
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QPushButton, QLabel
 
 
 class UserInterface(object):
@@ -17,26 +17,26 @@ class UserInterface(object):
     def setup_ui(self, win_plot):
         win_plot.setObjectName("win_plot")
         win_plot.resize(300, 80)
-        central_widget = QtGui.QWidget(win_plot)
-        vertical_layout = QtGui.QVBoxLayout(central_widget)
+        central_widget = QtWidgets.QWidget(win_plot)
+        vertical_layout = QtWidgets.QVBoxLayout(central_widget)
 
-        self.auto_prog_button = QtGui.QPushButton(central_widget)
+        self.auto_prog_button = QtWidgets.QPushButton(central_widget)
         self.auto_prog_button.setObjectName("auto_prog_button")
         self.auto_prog_button.setStyleSheet("background-color: red; font-size: 18pt")
         self.auto_prog_button.clicked.connect(self.callback_auto_prog_clicked)
         vertical_layout.addWidget(self.auto_prog_button)
 
-        self.intensity_label = QtGui.QLabel(central_widget)
+        self.intensity_label = QtWidgets.QLabel(central_widget)
         self.intensity_label.setObjectName("lbl_intensity")
         self.intensity_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
         vertical_layout.addWidget(self.intensity_label)
 
-        self.beat_label = QtGui.QLabel(central_widget)
+        self.beat_label = QtWidgets.QLabel(central_widget)
         self.beat_label.setObjectName("lbl_beat")
         self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
         vertical_layout.addWidget(self.beat_label)
 
-        self.bar_label = QtGui.QLabel(central_widget)
+        self.bar_label = QtWidgets.QLabel(central_widget)
         self.bar_label.setObjectName("lbl_bar")
         self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
         vertical_layout.addWidget(self.bar_label)
@@ -46,11 +46,11 @@ class UserInterface(object):
         QtCore.QMetaObject.connectSlotsByName(win_plot)
 
     def translate_ui(self, win_plot):
-        win_plot.setWindowTitle(QtGui.QApplication.translate("win_plot", "Beat Detector", None, QtGui.QApplication.UnicodeUTF8))
-        self.auto_prog_button.setText(QtGui.QApplication.translate("win_plot", "Auto Prog OFF", None, QtGui.QApplication.UnicodeUTF8))
-        self.intensity_label.setText(QtGui.QApplication.translate("win_plot", "Intensity", None, QtGui.QApplication.UnicodeUTF8))
-        self.beat_label.setText(QtGui.QApplication.translate("win_plot", "Beat", None, QtGui.QApplication.UnicodeUTF8))
-        self.bar_label.setText(QtGui.QApplication.translate("win_plot", "BPM", None, QtGui.QApplication.UnicodeUTF8))
+        win_plot.setWindowTitle(QtWidgets.QApplication.translate("win_plot", "Beat Detector", None))
+        self.auto_prog_button.setText(QtWidgets.QApplication.translate("win_plot", "Auto Prog OFF", None))
+        self.intensity_label.setText(QtWidgets.QApplication.translate("win_plot", "Intensity", None))
+        self.beat_label.setText(QtWidgets.QApplication.translate("win_plot", "Beat", None))
+        self.bar_label.setText(QtWidgets.QApplication.translate("win_plot", "BPM", None))
 
     def change_auto_prog_state(self, enabled):
         if enabled:

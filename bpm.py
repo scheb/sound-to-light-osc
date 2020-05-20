@@ -1,11 +1,11 @@
-from PyQt4.QtCore import QTimer
-from PyQt4 import QtCore
+from PyQt5.QtCore import QTimer
+from PyQt5 import QtCore
 from recorder import *
 from time import perf_counter
 
 class AudioAnalyzer:
-    min_bpm = 60
-    max_bpm = 180
+    min_bpm = 80
+    max_bpm = 160
     bpm_history_length = 16  # beats
     freq_history_length = 24  # samples
     intensity_history_length = 128  # samples
