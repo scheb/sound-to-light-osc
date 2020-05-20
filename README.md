@@ -12,7 +12,7 @@ I use [QLC+](https://github.com/mcallegari/qlcplus) for DMX control.
 ## Required modules
 
 - PyAudio
-- PyQt4
+- PyQt5
 - PyQwt
 - matplotlib
 - scipy

@@ -3,7 +3,7 @@ import random
 import osc
 import ui
 import sys
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtWidgets
 from bpm import SignalGenerator, AudioAnalyzer
 from recorder import *
 
@@ -12,7 +12,7 @@ class BeatDetector:
     ui: ui.UserInterface
     osc_client: osc.OscClient
     input_recorder: InputRecorder
-    timer_period = 1000 / (180 / 60) / 16  # 180bpm / 16
+    timer_period = int(round(1000 / (180 / 60) / 16))  # 180bpm / 16
 
     min_program_beats = 8
     max_program_beats = 8 * 4
@@ -58,7 +58,7 @@ class BeatDetector:
         self.timer = QtCore.QTimer()
         self.timer.start(self.timer_period)
 
-        window.connect(self.timer, QtCore.SIGNAL('timeout()'), self.audio_analyzer.analyze_audio)
+        self.timer.timeout.connect(self.audio_analyzer.analyze_audio)
         self.input_recorder.start()
 
     def change_program_if_needed(self):
@@ -127,8 +127,8 @@ class BeatDetector:
 
 if __name__ == "__main__":
     # Setup UI
-    app = QtGui.QApplication(sys.argv)
-    window = ui.QtGui.QMainWindow()
+    app = QtWidgets.QApplication(sys.argv)
+    window = QtWidgets.QMainWindow()
 
     # Start beat tracking
     beat_detector = BeatDetector(window)
