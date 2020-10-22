@@ -1,7 +1,7 @@
-# python-beat-detector
+# sound-to-light-osc
 
-Real-time detection of beats for audio from an input device (typically "Stereo Mix"). Outputs OSC signals, which can be
-used for sound-to-light control.
+Real-time detection of beats with Python from an audio input device (typically "Stereo Mix"). Outputs OSC signals,
+to be used for sound-to-light control.
 
 It keeps track of the music "intensity" (calm, normal, intense) to switch lighting programs.
 
