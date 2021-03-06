@@ -1,4 +1,5 @@
-# sound-to-light-osc
+sound-to-light-osc
+==================
 
 Real-time detection of beats with Python from an audio input device (typically "Stereo Mix"). Outputs OSC signals,
 to be used for sound-to-light control.
@@ -9,7 +10,8 @@ I use [QLC+](https://github.com/mcallegari/qlcplus) for DMX control.
 
 ![Video](video.gif)
 
-## Required modules
+Required modules
+----------------
 
 - PyAudio
 - PyQt5
@@ -18,13 +20,15 @@ I use [QLC+](https://github.com/mcallegari/qlcplus) for DMX control.
 - scipy
 - python-osc
 
-## Usage
+Usage
+-----
 
 `python beatDetector.py`
 
 Automatically listens to default audio input device.
 
-## OSC Signals
+OSC Signals
+-----------
 
 OSC signals are sent to `localhost:7701`, can be changed in `beatDetector.py`.
 
@@ -32,11 +36,13 @@ OSC signals are sent to `localhost:7701`, can be changed in `beatDetector.py`.
 - `/bar` is sent every to change the lighting scene.
 - `/prog1` - `/prog8` is sent to change lighting programs (available have to be configured in `beatDetector.py`)
 
-## Acknowledgments
+Acknowledgments
+---------------
 
 Based on [shunfu/python-beat-detector](https://github.com/shunfu/python-beat-detector).
 
-## Version History
+Version History
+---------------
 
 ### 1.0
 
@@ -50,3 +56,12 @@ Based on [shunfu/python-beat-detector](https://github.com/shunfu/python-beat-det
 - Improved pause detection
 - Intensity detection
 - Automatic lighting program switch
+
+Support Me
+----------
+I love to hear from people using my work, it's giving me the motivation to keep working on it.
+
+If you want to let me know you're finding it useful, please consider giving it a star ⭐ on GitHub.
+
+If you love my work and want to say thank you, you can help me out for a beer 🍻️
+[via PayPal](https://paypal.me/ChristianScheb).
