@@ -14,7 +14,7 @@ class InputRecorder:
         self.kill_threads = False
         self.has_new_audio = False
         self.beatDetector = beatDetector
-        self.actualIndex = 1
+        self.actual_index = 1
         self.setup()
 
     def setup(self):
@@ -46,7 +46,7 @@ class InputRecorder:
                                      input=True,
                                      frames_per_buffer=self.BUFFERSIZE)
         self.beatDetector.ui.select_audio_source(default_input_device_info["index"])
-        self.actualIndex = default_input_device_info["index"]
+        self.actual_index = default_input_device_info["index"]
 
         self.audio = numpy.empty((self.chunks_to_record * self.BUFFERSIZE), dtype=numpy.int16)
 
@@ -55,7 +55,7 @@ class InputRecorder:
         self.p.close(self.in_stream)
 
     def change_input(self, index):
-        if index != self.actualIndex:
+        if index != self.actual_index:
             print("Using input device : {:s}".format(self.p.get_device_info_by_host_api_device_index(0, index).get('name')))
             self.in_stream = self.p.open(format=pyaudio.paInt16,
                                          channels=1,
@@ -63,7 +63,7 @@ class InputRecorder:
                                          rate=self.RATE,
                                          input=True,
                                          frames_per_buffer=self.BUFFERSIZE)
-            self.actualIndex = index
+            self.actual_index = index
 
     ### RECORDING AUDIO ###
 
