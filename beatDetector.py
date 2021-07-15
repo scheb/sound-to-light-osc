@@ -37,13 +37,13 @@ class BeatDetector:
     ]
 
     def __init__(self, window) -> None:
-        self.ui = ui.UserInterface(self.on_auto_prog_button_clicked)
+        self.ui = ui.UserInterface(self.on_auto_prog_button_clicked, self.on_input_changed)
         self.ui.setup_ui(window)
         self.osc_client = osc.OscClient("localhost", 7701)
         self.auto_prog = False
 
         # Wire up beat detector and signal generation
-        self.input_recorder = InputRecorder()
+        self.input_recorder = InputRecorder(self)
         self.audio_analyzer = AudioAnalyzer(self.input_recorder)
         signal_generator = SignalGenerator(self.audio_analyzer)
 
@@ -87,6 +87,9 @@ class BeatDetector:
         if self.auto_prog:
             self.change_program = True
         self.ui.change_auto_prog_state(self.auto_prog)
+
+    def on_input_changed(self, index):
+        self.input_recorder.change_input(index)
 
     def on_beat(self, beat_index):
         # print("beat")
