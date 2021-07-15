@@ -11,14 +11,30 @@ class UserInterface(object):
     beat_color_index = 0
     bar_color_index = 0
 
-    def __init__(self, auto_prog_callback):
+    def __init__(self, auto_prog_callback, callback_input_changed):
         self.callback_auto_prog_clicked = auto_prog_callback
+        self.callback_input_changed = callback_input_changed
 
     def setup_ui(self, win_plot):
         win_plot.setObjectName("win_plot")
         win_plot.resize(300, 80)
         central_widget = QtWidgets.QWidget(win_plot)
         vertical_layout = QtWidgets.QVBoxLayout(central_widget)
+
+        input_widget = QtWidgets.QWidget(win_plot)
+        input_widget.setFixedHeight(65)
+        vertical_layout_input = QtWidgets.QVBoxLayout(input_widget)
+
+        self.input_label = QtWidgets.QLabel(central_widget)
+
+        self.input_combobox = QtWidgets.QComboBox(central_widget)
+        self.input_combobox.setStyleSheet("background-color: #a9a9a9; font-size: 15pt; selection-background-color: transparent; selection-color: black")
+        self.input_combobox.setObjectName("auto_prog_button")
+        self.input_combobox.activated.connect(self.callback_input_changed)
+
+        vertical_layout_input.addWidget(self.input_label)
+        vertical_layout_input.addWidget(self.input_combobox)
+        vertical_layout.addWidget(input_widget)
 
         self.auto_prog_button = QtWidgets.QPushButton(central_widget)
         self.auto_prog_button.setObjectName("auto_prog_button")
@@ -51,6 +67,7 @@ class UserInterface(object):
         self.intensity_label.setText(QtWidgets.QApplication.translate("win_plot", "Intensity", None))
         self.beat_label.setText(QtWidgets.QApplication.translate("win_plot", "Beat", None))
         self.bar_label.setText(QtWidgets.QApplication.translate("win_plot", "BPM", None))
+        self.input_label.setText(QtWidgets.QApplication.translate("win_plot", "Audio Source", None))
 
     def change_auto_prog_state(self, enabled):
         if enabled:
@@ -88,3 +105,9 @@ class UserInterface(object):
     def display_new_song(self):
         self.beat_label.setText("Beat")
         self.bar_label.setText("BPM: New song")
+
+    def add_audio_source(self, text):
+        self.input_combobox.addItem(text)
+
+    def select_audio_source(self, index):
+        self.input_combobox.setCurrentIndex(index)
