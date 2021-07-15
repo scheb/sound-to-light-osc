@@ -99,7 +99,7 @@ class AudioAnalyzer:
             self.low_history.append(low)
             self.bass_history.append(bass)
             self.low_midrange_history.append(low_midrange)
-            
+
             # recent_low_avg = numpy.mean(self.low_history)
             recent_bass_avg = numpy.mean(self.bass_history)
             recent_low_midrange_avg = numpy.mean(self.low_midrange_history)
@@ -139,6 +139,7 @@ class AudioAnalyzer:
             self.max_volume = numpy.percentile(self.volume_long_history, 95)
 
     def track_intensity(self, level):
+        self.input_recorder.beatDetector.ui.display_input_intensity(level*100/self.max_volume)
         self.intensity_history.append(level / self.max_volume)
         if len(self.intensity_history) < self.intensity_history_length / 2:
             return
