@@ -25,8 +25,6 @@ Usage
 
 `python beatDetector.py`
 
-Automatically listens to default audio input device.
-
 OSC Signals
 -----------
 
