@@ -34,6 +34,19 @@ OSC signals are sent to `localhost:7701`, can be changed in `beatDetector.py`.
 - `/bar` is sent every to change the lighting scene.
 - `/prog1` - `/prog8` is sent to change lighting programs (available have to be configured in `beatDetector.py`)
 
+Contributing
+------------
+
+Thanks for your interest in contributing to this project! Glad you like it 😊
+
+I typically do not accept contributions to this project, as I've built this for myself and it just works fine for
+me the way it is. The project isn't intended to work for anyone but myself. I've put it onto GitHub in case
+someone finds this useful. So if you need changes, feel free to fork the repository and modify it for your own
+needs.
+
+If you have an idea that you believe is worth integrating, please reach out first. I don't want you to work on 
+things that I wouldn't merge.
+
 Acknowledgments
 ---------------
 
