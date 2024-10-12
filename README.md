@@ -68,6 +68,10 @@ Version History
 - Intensity detection
 - Automatic lighting program switch
 
+License
+-------
+This software is available under the [MIT license](LICENSE).
+
 Support Me
 ----------
 I love to hear from people using my work, it's giving me the motivation to keep working on it.
