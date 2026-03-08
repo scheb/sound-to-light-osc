@@ -1,5 +1,6 @@
 from PyQt5.QtCore import QTimer
 from PyQt5 import QtCore
+import numpy
 
 from recorder import *
 from time import perf_counter
@@ -17,8 +18,16 @@ class AudioAnalyzer:
         self.callback_new_song = lambda: None
         self.callback_pause = lambda: None
         self.callback_intensity_changed = lambda: None
+        self.callback_input_intensity_changed = lambda: None
         self.prev_volume_track_time = 0
         self.volume_long_history = []
+
+        # Beat detection attributes
+        self.beat_time = 0
+        self.beat_timestamps = []
+        self.energy_history = []
+        self.beat_detection_threshold = 1.4  # Tuned for better accuracy
+        self.beat_refractory_period = 0.2  # seconds
 
     def analyze_audio(self):
         if not self.input_recorder.has_new_audio:
@@ -30,7 +39,56 @@ class AudioAnalyzer:
         xs, ys = self.input_recorder.fft()
         self.input_recorder.has_new_audio = False
 
-        # TODO: Implement beat detection
+        # --- VU Meter ---
+        # Calculate the volume (RMS of the raw signal)
+        # Cast to float64 to prevent overflow before squaring
+        audio_data = self.input_recorder.audio.astype(numpy.float64)
+        volume = numpy.sqrt(numpy.mean(audio_data**2))
+
+        # Handle NaN values, which can occur if audio buffer is empty
+        if numpy.isnan(volume):
+            volume = 0
+
+        # Normalize it to a 0-100 range (this may need tuning)
+        vu_level = min(100, int(volume / 100))
+        self.callback_input_intensity_changed(vu_level)
+
+
+        # --- Beat Detection Implementation ---
+
+        # 1. Calculate energy in a frequency band (e.g., bass)
+        bass_energy = numpy.sum(ys[numpy.where((xs > 20) & (xs < 250))])
+
+        # 2. Keep a history of energy values
+        self.energy_history.append(bass_energy)
+        if len(self.energy_history) > 100:  # Keep the last ~10 seconds of energy values
+            self.energy_history.pop(0)
+
+        if not self.energy_history:
+            return
+
+        # 3. Calculate the average energy from history
+        average_energy = numpy.mean(self.energy_history)
+
+        # 4. Detect a beat if current energy is significantly higher than the average
+        is_beat = bass_energy > average_energy * self.beat_detection_threshold
+
+        if is_beat and (self.current_time - self.beat_time) > self.beat_refractory_period:
+            self.beat_time = self.current_time
+            self.beat_timestamps.append(self.beat_time)
+
+            if len(self.beat_timestamps) > 20:  # Keep last 20 beats for BPM calculation
+                self.beat_timestamps.pop(0)
+
+            if len(self.beat_timestamps) > 1:
+                # Calculate BPM from inter-beat intervals
+                ibis = numpy.diff(self.beat_timestamps)
+                avg_ibi = numpy.mean(ibis)
+                if avg_ibi > 0:
+                    bpm = 60 / avg_ibi
+                    # Clamp BPM to a reasonable range
+                    if 70 < bpm < 180:
+                        self.callback_beat_detected(self.beat_time, bpm)
 
     def on_beat_detected(self, callback):
         self.callback_beat_detected = callback
@@ -43,6 +101,9 @@ class AudioAnalyzer:
 
     def on_intensity_changed(self, callback):
         self.callback_intensity_changed = callback
+
+    def on_input_intensity_changed(self, callback):
+        self.callback_input_intensity_changed = callback
 
 
 class SignalGenerator:
@@ -122,15 +183,15 @@ class SignalGenerator:
             self.generate_beat_signal(beat_time=beat_time)
 
     def can_auto_generate(self):
-        # return False  # Disabled auto beat generation
-        if self.bpm > 0 and len(self.last_beats) >= 8:
-            oldest_beat = numpy.min(self.last_beats)
-            newest_beat = numpy.min(self.last_beats)
-            max_difference = 60 / self.bpm * 16  # 8 beats max
-
-            # We have to see at least half of the expected beats to start auto generating
-            return newest_beat - oldest_beat < max_difference
-        return False
+        return False  # Disabled auto beat generation
+        # if self.bpm > 0 and len(self.last_beats) >= 8:
+        #     oldest_beat = numpy.min(self.last_beats)
+        #     newest_beat = numpy.max(self.last_beats)
+        #     max_difference = 60 / self.bpm * 16  # 16 beats max
+        #
+        #     # We have to see at least half of the expected beats to start auto generating
+        #     return newest_beat - oldest_beat < max_difference
+        # return False
 
     def generate_beat_signal(self, beat_time=None):
         if beat_time is None:

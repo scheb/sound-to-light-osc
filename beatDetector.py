@@ -53,6 +53,7 @@ class BeatDetector:
         signal_generator.on_new_song(self.on_new_song)
         signal_generator.on_bpm_change(self.on_bpm_change)
         signal_generator.on_intensity_change(self.on_intensity_change)
+        self.audio_analyzer.on_input_intensity_changed(self.ui.display_input_intensity)
 
         # Start beat detection
         self.timer = QtCore.QTimer()
