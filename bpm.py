@@ -1,13 +1,11 @@
-from PyQt5.QtCore import QTimer
-from PyQt5 import QtCore
+from PyQt5.QtCore import QTimer, QObject, pyqtSignal, pyqtSlot
 import numpy
 
 from recorder import *
 from time import perf_counter
 
-class VuMeter:
-    def __init__(self):
-        self.callback_input_intensity_changed = lambda: None
+class VuMeter(QObject):
+    vu_level_changed = pyqtSignal(int)
 
     def update(self, audio_data):
         # Calculate the volume (RMS of the raw signal)
@@ -15,17 +13,16 @@ class VuMeter:
         if numpy.isnan(volume):
             volume = 0
         vu_level = min(100, int(volume / 100))
-        self.callback_input_intensity_changed(vu_level)
+        self.vu_level_changed.emit(vu_level)
         return volume
-    
-    def on_input_intensity_changed(self, callback):
-        self.callback_input_intensity_changed = callback
 
-class IntensityDetector:
+class IntensityDetector(QObject):
+    pause_detected = pyqtSignal()
+    intensity_changed = pyqtSignal(int)
+
     def __init__(self):
+        super().__init__()
         self.current_intensity = 0
-        self.callback_pause = lambda: None
-        self.callback_intensity_changed = lambda: None
         self.volume_long_history = []
         self.pause_counter = 0
         
@@ -41,27 +38,24 @@ class IntensityDetector:
         if len(self.volume_long_history) > 50:
             avg_vol = numpy.mean(self.volume_long_history)
 
-            # Detect Pause/Silence (Volume below 500 raw RMS is usually noise/silence)
+            # Detect Pause/Silence
             if volume < 500:
                 self.pause_counter += 1
                 if self.pause_counter > 100:  # ~2 seconds of silence
-                    self.callback_pause()
+                    self.pause_detected.emit()
                     self.pause_counter = 0
             else:
                 self.pause_counter = 0
 
             # Detect Intensity
-            # Use a short-term average (last ~1s = 50 frames) for stability
             current_avg_vol = numpy.mean(self.volume_long_history[-50:])
             
             detected_intensity = 0
-            # More sensitive thresholds against a more stable baseline
             if current_avg_vol > avg_vol * 1.1 and current_avg_vol > 1000:
                 detected_intensity = 1  # Intense
             elif current_avg_vol < avg_vol * 0.9:
                 detected_intensity = -1  # Calm
             
-            # Resistance to change: Require sustained state for ~1 second
             if detected_intensity != self.current_intensity:
                 if detected_intensity == self.pending_intensity:
                     self.intensity_hold_counter += 1
@@ -71,68 +65,44 @@ class IntensityDetector:
                 
                 if self.intensity_hold_counter > 50: # ~1 second at 50Hz
                     self.current_intensity = detected_intensity
-                    self.callback_intensity_changed(detected_intensity)
+                    self.intensity_changed.emit(detected_intensity)
                     self.intensity_hold_counter = 0
             else:
                 self.intensity_hold_counter = 0
                 self.pending_intensity = None
 
-    def on_pause(self, callback):
-        self.callback_pause = callback
+class BeatDetector(QObject):
+    beat_detected = pyqtSignal(float, float)
 
-    def on_intensity_changed(self, callback):
-        self.callback_intensity_changed = callback
-
-class BeatDetector:
     def __init__(self):
-        self.callback_beat_detected = lambda: None
+        super().__init__()
         self.beat_time = 0
         self.beat_timestamps = []
-        self.beat_refractory_period = 0.2  # seconds to prevent double-triggering
-        
-        # Onset Detection Function (ODF)
+        self.beat_refractory_period = 0.2
         self.prev_spectrum = None
         self.odf_history = []
-        self.odf_history_size = 50  # Number of frames to calculate dynamic threshold
-
-        # Dynamic thresholding
+        self.odf_history_size = 50
         self.dynamic_threshold_multiplier = 1.4
-        self.dynamic_threshold_offset = 0.05 # A small constant to avoid silence issues
+        self.dynamic_threshold_offset = 0.05
 
     def update(self, xs, ys, current_time):
-        # Focus on the rhythm section (0 - 1000 Hz) to reduce high-frequency noise
         freq_mask = (xs <= 1000)
         ys_band = ys[freq_mask]
 
-        if self.prev_spectrum is None:
-            self.prev_spectrum = ys_band
-            return
-        
-        # Ensure shapes match
-        if len(ys_band) != len(self.prev_spectrum):
+        if self.prev_spectrum is None or len(ys_band) != len(self.prev_spectrum):
             self.prev_spectrum = ys_band
             return
 
-        # 1. Calculate Onset Detection Function (ODF) using Spectral Flux
-        # Spectral flux is the sum of positive changes in the spectrum magnitude
         spectral_flux = numpy.sum(numpy.maximum(0, ys_band - self.prev_spectrum))
         self.prev_spectrum = ys_band
 
-        # 2. Dynamic Thresholding
         self.odf_history.append(spectral_flux)
-        if len(self.odf_history) > self.odf_history_size:
-            self.odf_history.pop(0)
-        
-        if not self.odf_history:
-            return
+        if len(self.odf_history) > self.odf_history_size: self.odf_history.pop(0)
+        if not self.odf_history: return
 
-        # The threshold is based on the median of recent ODF values
         median_odf = numpy.median(self.odf_history)
         dynamic_threshold = (median_odf * self.dynamic_threshold_multiplier) + self.dynamic_threshold_offset
 
-        # 3. Peak Picking
-        # A beat is a peak in the ODF that is above the dynamic threshold
-        # To be a peak, it must be the maximum value in a small local window
         is_peak = spectral_flux >= numpy.max(self.odf_history[-3:]) if len(self.odf_history) >= 3 else True
         is_beat = spectral_flux > dynamic_threshold and is_peak
 
@@ -140,106 +110,51 @@ class BeatDetector:
             self.beat_time = current_time
             self.beat_timestamps.append(self.beat_time)
 
-            # Keep more history for better stability
-            if len(self.beat_timestamps) > 32: 
-                self.beat_timestamps.pop(0)
+            if len(self.beat_timestamps) > 32: self.beat_timestamps.pop(0)
 
             if len(self.beat_timestamps) > 4:
-                # --- Robust BPM Calculation ---
                 intervals = numpy.diff(self.beat_timestamps)
-                
-                # Filter out unrealistic intervals (e.g. > 200 BPM or < 40 BPM)
-                # 200 BPM ~= 0.3s, 40 BPM ~= 1.5s
                 valid_intervals = intervals[(intervals > 0.3) & (intervals < 1.5)]
                 
                 if len(valid_intervals) > 2:
-                    # Use median to find the "center" of the distribution
                     median_ibi = numpy.median(valid_intervals)
-                    
-                    # Filter intervals close to the median (within 15%)
-                    # This rejects outliers (missed beats or double hits)
                     consistent_intervals = valid_intervals[numpy.abs(valid_intervals - median_ibi) < 0.15 * median_ibi]
                     
                     if len(consistent_intervals) > 0:
                         avg_ibi = numpy.mean(consistent_intervals)
                         bpm = 60 / avg_ibi
-                        self.callback_beat_detected(self.beat_time, bpm)
+                        self.beat_detected.emit(self.beat_time, bpm)
 
-    def on_beat_detected(self, callback):
-        self.callback_beat_detected = callback
-
-class AudioAnalyzer:
-    input_recorder: InputRecorder
-
-    # Timing
-    current_time: float
-
+class AudioAnalyzer(QObject):
     def __init__(self, input_recorder):
+        super().__init__()
         self.input_recorder = input_recorder
         
         self.vu_meter = VuMeter()
         self.intensity_detector = IntensityDetector()
         self.beat_detector = BeatDetector()
-        
-        self.callback_new_song = lambda: None
 
     def analyze_audio(self):
-        if not self.input_recorder.has_new_audio:
-            return
+        if not self.input_recorder.has_new_audio: return
 
-        self.current_time = perf_counter()
-
-        # Get x and y values from FFT
+        current_time = perf_counter()
         xs, ys = self.input_recorder.fft()
-        # Cast to float64 to prevent overflow before squaring
         audio_data = self.input_recorder.audio.astype(numpy.float64)
         self.input_recorder.has_new_audio = False
 
-        # --- Update Components ---
         volume = self.vu_meter.update(audio_data)
         self.intensity_detector.update(volume)
-        self.beat_detector.update(xs, ys, self.current_time)
+        self.beat_detector.update(xs, ys, current_time)
 
-    def on_beat_detected(self, callback):
-        self.beat_detector.on_beat_detected(callback)
-
-    def on_new_song_detected(self, callback):
-        self.callback_new_song = callback
-
-    def on_pause(self, callback):
-        self.intensity_detector.on_pause(callback)
-
-    def on_intensity_changed(self, callback):
-        self.intensity_detector.on_intensity_changed(callback)
-
-    def on_input_intensity_changed(self, callback):
-        self.vu_meter.on_input_intensity_changed(callback)
-
-
-class SignalGenerator:
-    bar_modulo: int
-    beat_index: int
-    bpm: int
-    auto_generating = False
-    timer: QTimer
-    last_beats: list
-    last_beat_time: float
-    intensity: int
-
-    def __init__(self, audio_analyzer) -> None:
+class SignalGenerator(QObject):
+    bpm_changed = pyqtSignal(int)
+    beat_signal = pyqtSignal(int)
+    bar_detected = pyqtSignal()
+    new_song_detected = pyqtSignal()
+    
+    def __init__(self) -> None:
+        super().__init__()
         self.reset_tracking()
-
-        self.callback_beat = lambda: None
-        self.callback_bar = lambda: None
-        self.callback_new_song = lambda: None
-        self.callback_bpm_change = lambda: None
-        self.callback_intensity_change = lambda: None
-
-        # Wire up detection events
-        audio_analyzer.on_beat_detected(self.track_beat)
-        audio_analyzer.on_new_song_detected(self.track_new_song)
-        audio_analyzer.on_pause(self.track_pause)
-        audio_analyzer.on_intensity_changed(self.track_intensity_change)
 
     def reset_tracking(self):
         self.bar_modulo = 2
@@ -248,37 +163,27 @@ class SignalGenerator:
         self.bpm = 0
         self.intensity = 0
         self.last_beat_time = 0
-        self.last_beats = []  # Sliding window of the last 4 beats
+        self.last_beats = []
 
     def reset_beat_index(self):
         self.beat_index = -1
 
     def recalculate_bar_modulo(self):
-        # Bar modulo based on intensity
         modulo = 2
-        if self.intensity == 1:
-            modulo = 1
-        if self.intensity == -1:
-            modulo = 4
-
-        # Additional modifier based in BPM
-        if self.bpm > 0:
-            if self.bpm < 100:
-                modulo /= 2
-            # if self.bpm > 155:
-            #     modulo *= 2
-
-        self.bar_modulo = numpy.max([1, modulo])  # Must be at least 1
+        if self.intensity == 1: modulo = 1
+        if self.intensity == -1: modulo = 4
+        if self.bpm > 0 and self.bpm < 100: modulo /= 2
+        self.bar_modulo = numpy.max([1, modulo])
         print("Bar modulo: {:.0f}".format(self.bar_modulo))
 
+    @pyqtSlot(float, float)
     def track_beat(self, beat_time, bpm):
         bpm_changed = False
-
         if abs(bpm - self.bpm) > 1:
             print("BPM changed {:d} -> {:d}".format(int(self.bpm), int(bpm)))
             self.bpm = bpm
             self.recalculate_bar_modulo()
-            self.callback_bpm_change(bpm)
+            self.bpm_changed.emit(int(bpm))
             bpm_changed = True
 
         if self.auto_generating:
@@ -293,69 +198,48 @@ class SignalGenerator:
             self.generate_beat_signal(beat_time=beat_time)
 
     def can_auto_generate(self):
-        return False  # Disabled auto beat generation, keep it disabled
-        # if self.bpm > 0 and len(self.last_beats) >= 8:
-        #     oldest_beat = numpy.min(self.last_beats)
-        #     newest_beat = numpy.max(self.last_beats)
-        #     max_difference = 60 / self.bpm * 16  # 16 beats max
-        #
-        #     # We have to see at least half of the expected beats to start auto generating
-        #     return newest_beat - oldest_beat < max_difference
-        # return False
+        if self.bpm > 0 and len(self.last_beats) >= 8:
+            oldest_beat = numpy.min(self.last_beats)
+            newest_beat = numpy.max(self.last_beats)
+            max_difference = 60 / self.bpm * 16
+            return newest_beat - oldest_beat < max_difference
+        return False
 
     def generate_beat_signal(self, beat_time=None):
-        if beat_time is None:
-            beat_time = perf_counter()
+        if beat_time is None: beat_time = perf_counter()
 
-        # Protect against too many beat signals at once
         if beat_time - self.last_beat_time > 0.333:
             self.last_beats.append(beat_time)
-            if len(self.last_beats) > 8:  # Keep the last 8 beats
-                self.last_beats = self.last_beats[1:]
+            if len(self.last_beats) > 8: self.last_beats.pop(0)
             self.last_beat_time = beat_time
             self.beat_index += 1
 
             beat_index_mod = self.beat_index % (self.bar_modulo * 2)
             if self.beat_index % 2 == 0:
-                self.callback_beat(int(beat_index_mod / 2))
+                self.beat_signal.emit(int(beat_index_mod / 2))
             if beat_index_mod == 0:
-                self.callback_bar()
+                self.bar_detected.emit()
 
         if self.auto_generating:
-            self.timer = QtCore.QTimer()
+            self.timer = QTimer()
             self.timer.setSingleShot(True)
             self.timer.timeout.connect(self.generate_beat_signal)
-            time_passed = int((perf_counter() - beat_time) * 1000)  # Take code execution time into account
+            time_passed = int((perf_counter() - beat_time) * 1000)
             timeout = int(60000 / self.bpm) - time_passed
             self.timer.start(timeout)
 
+    @pyqtSlot()
     def track_new_song(self):
-        self.callback_new_song()
-        self.callback_intensity_change(0)
+        self.new_song_detected.emit()
         self.reset_tracking()
 
+    @pyqtSlot()
     def track_pause(self):
-        if hasattr(self, 'timer'):
-            self.timer.stop()
+        if hasattr(self, 'timer'): self.timer.stop()
         self.auto_generating = False
         self.reset_beat_index()
 
+    @pyqtSlot(int)
     def track_intensity_change(self, intensity):
         self.intensity = intensity
         self.recalculate_bar_modulo()
-        self.callback_intensity_change(intensity)
-
-    def on_beat(self, callback):
-        self.callback_beat = callback
-
-    def on_bar(self, callback):
-        self.callback_bar = callback
-
-    def on_new_song(self, callback):
-        self.callback_new_song = callback
-
-    def on_bpm_change(self, callback):
-        self.callback_bpm_change = callback
-
-    def on_intensity_change(self, callback):
-        self.callback_intensity_change = callback
