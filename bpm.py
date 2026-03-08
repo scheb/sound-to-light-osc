@@ -5,21 +5,27 @@ import numpy
 from recorder import *
 from time import perf_counter
 
-class AudioAnalyzer:
-    input_recorder: InputRecorder
+class VuMeter:
+    def __init__(self):
+        self.callback_input_intensity_changed = lambda: None
 
-    # Timing
-    current_time: float
+    def update(self, audio_data):
+        # Calculate the volume (RMS of the raw signal)
+        volume = numpy.sqrt(numpy.mean(audio_data**2))
+        if numpy.isnan(volume):
+            volume = 0
+        vu_level = min(100, int(volume / 100))
+        self.callback_input_intensity_changed(vu_level)
+        return volume
+    
+    def on_input_intensity_changed(self, callback):
+        self.callback_input_intensity_changed = callback
 
-    def __init__(self, input_recorder):
-        self.input_recorder = input_recorder
+class IntensityDetector:
+    def __init__(self):
         self.current_intensity = 0
-        self.callback_beat_detected = lambda: None
-        self.callback_new_song = lambda: None
         self.callback_pause = lambda: None
         self.callback_intensity_changed = lambda: None
-        self.callback_input_intensity_changed = lambda: None
-        self.prev_volume_track_time = 0
         self.volume_long_history = []
         self.pause_counter = 0
         
@@ -27,39 +33,7 @@ class AudioAnalyzer:
         self.pending_intensity = 0
         self.intensity_hold_counter = 0
 
-        # --- Enhanced Beat Detection Attributes ---
-        self.beat_time = 0
-        self.beat_timestamps = []
-        self.beat_refractory_period = 0.2  # seconds to prevent double-triggering
-
-        # Onset Detection Function (ODF)
-        self.prev_spectrum = None
-        self.odf_history = []
-        self.odf_history_size = 50  # Number of frames to calculate dynamic threshold
-
-        # Dynamic thresholding
-        self.dynamic_threshold_multiplier = 1.4
-        self.dynamic_threshold_offset = 0.05 # A small constant to avoid silence issues
-
-    def analyze_audio(self):
-        if not self.input_recorder.has_new_audio:
-            return
-
-        self.current_time = perf_counter()
-
-        # Get x and y values from FFT
-        xs, ys = self.input_recorder.fft()
-        self.input_recorder.has_new_audio = False
-
-        # --- VU Meter ---
-        audio_data = self.input_recorder.audio.astype(numpy.float64)
-        volume = numpy.sqrt(numpy.mean(audio_data**2))
-        if numpy.isnan(volume):
-            volume = 0
-        vu_level = min(100, int(volume / 100))
-        self.callback_input_intensity_changed(vu_level)
-
-        # --- Intensity & Silence Detection ---
+    def update(self, volume):
         self.volume_long_history.append(volume)
         if len(self.volume_long_history) > 1500:  # ~30 seconds history for a very stable baseline
             self.volume_long_history.pop(0)
@@ -103,8 +77,29 @@ class AudioAnalyzer:
                 self.intensity_hold_counter = 0
                 self.pending_intensity = None
 
-        # --- Enhanced Beat Detection using Band-Limited Spectral Flux ---
+    def on_pause(self, callback):
+        self.callback_pause = callback
 
+    def on_intensity_changed(self, callback):
+        self.callback_intensity_changed = callback
+
+class BeatDetector:
+    def __init__(self):
+        self.callback_beat_detected = lambda: None
+        self.beat_time = 0
+        self.beat_timestamps = []
+        self.beat_refractory_period = 0.2  # seconds to prevent double-triggering
+        
+        # Onset Detection Function (ODF)
+        self.prev_spectrum = None
+        self.odf_history = []
+        self.odf_history_size = 50  # Number of frames to calculate dynamic threshold
+
+        # Dynamic thresholding
+        self.dynamic_threshold_multiplier = 1.4
+        self.dynamic_threshold_offset = 0.05 # A small constant to avoid silence issues
+
+    def update(self, xs, ys, current_time):
         # Focus on the rhythm section (0 - 1000 Hz) to reduce high-frequency noise
         freq_mask = (xs <= 1000)
         ys_band = ys[freq_mask]
@@ -141,8 +136,8 @@ class AudioAnalyzer:
         is_peak = spectral_flux >= numpy.max(self.odf_history[-3:]) if len(self.odf_history) >= 3 else True
         is_beat = spectral_flux > dynamic_threshold and is_peak
 
-        if is_beat and (self.current_time - self.beat_time) > self.beat_refractory_period:
-            self.beat_time = self.current_time
+        if is_beat and (current_time - self.beat_time) > self.beat_refractory_period:
+            self.beat_time = current_time
             self.beat_timestamps.append(self.beat_time)
 
             # Keep more history for better stability
@@ -173,17 +168,52 @@ class AudioAnalyzer:
     def on_beat_detected(self, callback):
         self.callback_beat_detected = callback
 
+class AudioAnalyzer:
+    input_recorder: InputRecorder
+
+    # Timing
+    current_time: float
+
+    def __init__(self, input_recorder):
+        self.input_recorder = input_recorder
+        
+        self.vu_meter = VuMeter()
+        self.intensity_detector = IntensityDetector()
+        self.beat_detector = BeatDetector()
+        
+        self.callback_new_song = lambda: None
+
+    def analyze_audio(self):
+        if not self.input_recorder.has_new_audio:
+            return
+
+        self.current_time = perf_counter()
+
+        # Get x and y values from FFT
+        xs, ys = self.input_recorder.fft()
+        # Cast to float64 to prevent overflow before squaring
+        audio_data = self.input_recorder.audio.astype(numpy.float64)
+        self.input_recorder.has_new_audio = False
+
+        # --- Update Components ---
+        volume = self.vu_meter.update(audio_data)
+        self.intensity_detector.update(volume)
+        self.beat_detector.update(xs, ys, self.current_time)
+
+    def on_beat_detected(self, callback):
+        self.beat_detector.on_beat_detected(callback)
+
     def on_new_song_detected(self, callback):
         self.callback_new_song = callback
 
     def on_pause(self, callback):
-        self.callback_pause = callback
+        self.intensity_detector.on_pause(callback)
 
     def on_intensity_changed(self, callback):
-        self.callback_intensity_changed = callback
+        self.intensity_detector.on_intensity_changed(callback)
 
     def on_input_intensity_changed(self, callback):
-        self.callback_input_intensity_changed = callback
+        self.vu_meter.on_input_intensity_changed(callback)
 
 
 class SignalGenerator:
