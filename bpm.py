@@ -21,6 +21,11 @@ class AudioAnalyzer:
         self.callback_input_intensity_changed = lambda: None
         self.prev_volume_track_time = 0
         self.volume_long_history = []
+        self.pause_counter = 0
+        
+        # Intensity stability
+        self.pending_intensity = 0
+        self.intensity_hold_counter = 0
 
         # --- Enhanced Beat Detection Attributes ---
         self.beat_time = 0
@@ -53,6 +58,50 @@ class AudioAnalyzer:
             volume = 0
         vu_level = min(100, int(volume / 100))
         self.callback_input_intensity_changed(vu_level)
+
+        # --- Intensity & Silence Detection ---
+        self.volume_long_history.append(volume)
+        if len(self.volume_long_history) > 1500:  # ~30 seconds history for a very stable baseline
+            self.volume_long_history.pop(0)
+
+        if len(self.volume_long_history) > 50:
+            avg_vol = numpy.mean(self.volume_long_history)
+
+            # Detect Pause/Silence (Volume below 500 raw RMS is usually noise/silence)
+            if volume < 500:
+                self.pause_counter += 1
+                if self.pause_counter > 100:  # ~2 seconds of silence
+                    self.callback_pause()
+                    self.pause_counter = 0
+            else:
+                self.pause_counter = 0
+
+            # Detect Intensity
+            # Use a short-term average (last ~1s = 50 frames) for stability
+            current_avg_vol = numpy.mean(self.volume_long_history[-50:])
+            
+            detected_intensity = 0
+            # More sensitive thresholds against a more stable baseline
+            if current_avg_vol > avg_vol * 1.1 and current_avg_vol > 1000:
+                detected_intensity = 1  # Intense
+            elif current_avg_vol < avg_vol * 0.9:
+                detected_intensity = -1  # Calm
+            
+            # Resistance to change: Require sustained state for ~1 second
+            if detected_intensity != self.current_intensity:
+                if detected_intensity == self.pending_intensity:
+                    self.intensity_hold_counter += 1
+                else:
+                    self.pending_intensity = detected_intensity
+                    self.intensity_hold_counter = 0
+                
+                if self.intensity_hold_counter > 50: # ~1 second at 50Hz
+                    self.current_intensity = detected_intensity
+                    self.callback_intensity_changed(detected_intensity)
+                    self.intensity_hold_counter = 0
+            else:
+                self.intensity_hold_counter = 0
+                self.pending_intensity = None
 
         # --- Enhanced Beat Detection using Band-Limited Spectral Flux ---
 
@@ -214,7 +263,7 @@ class SignalGenerator:
             self.generate_beat_signal(beat_time=beat_time)
 
     def can_auto_generate(self):
-        return False  # Disabled auto beat generation
+        return False  # Disabled auto beat generation, keep it disabled
         # if self.bpm > 0 and len(self.last_beats) >= 8:
         #     oldest_beat = numpy.min(self.last_beats)
         #     newest_beat = numpy.max(self.last_beats)
