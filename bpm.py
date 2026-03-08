@@ -22,12 +22,19 @@ class AudioAnalyzer:
         self.prev_volume_track_time = 0
         self.volume_long_history = []
 
-        # Beat detection attributes
+        # --- Enhanced Beat Detection Attributes ---
         self.beat_time = 0
         self.beat_timestamps = []
-        self.energy_history = []
-        self.beat_detection_threshold = 1.4  # Tuned for better accuracy
-        self.beat_refractory_period = 0.2  # seconds
+        self.beat_refractory_period = 0.2  # seconds to prevent double-triggering
+
+        # Onset Detection Function (ODF)
+        self.prev_spectrum = None
+        self.odf_history = []
+        self.odf_history_size = 50  # Number of frames to calculate dynamic threshold
+
+        # Dynamic thresholding
+        self.dynamic_threshold_multiplier = 1.4
+        self.dynamic_threshold_offset = 0.05 # A small constant to avoid silence issues
 
     def analyze_audio(self):
         if not self.input_recorder.has_new_audio:
@@ -40,38 +47,41 @@ class AudioAnalyzer:
         self.input_recorder.has_new_audio = False
 
         # --- VU Meter ---
-        # Calculate the volume (RMS of the raw signal)
-        # Cast to float64 to prevent overflow before squaring
         audio_data = self.input_recorder.audio.astype(numpy.float64)
         volume = numpy.sqrt(numpy.mean(audio_data**2))
-
-        # Handle NaN values, which can occur if audio buffer is empty
         if numpy.isnan(volume):
             volume = 0
-
-        # Normalize it to a 0-100 range (this may need tuning)
         vu_level = min(100, int(volume / 100))
         self.callback_input_intensity_changed(vu_level)
 
+        # --- Enhanced Beat Detection using Spectral Flux ---
 
-        # --- Beat Detection Implementation ---
-
-        # 1. Calculate energy in a frequency band (e.g., bass)
-        bass_energy = numpy.sum(ys[numpy.where((xs > 20) & (xs < 250))])
-
-        # 2. Keep a history of energy values
-        self.energy_history.append(bass_energy)
-        if len(self.energy_history) > 100:  # Keep the last ~10 seconds of energy values
-            self.energy_history.pop(0)
-
-        if not self.energy_history:
+        if self.prev_spectrum is None:
+            self.prev_spectrum = ys
             return
 
-        # 3. Calculate the average energy from history
-        average_energy = numpy.mean(self.energy_history)
+        # 1. Calculate Onset Detection Function (ODF) using Spectral Flux
+        # Spectral flux is the sum of positive changes in the spectrum magnitude
+        spectral_flux = numpy.sum(numpy.maximum(0, ys - self.prev_spectrum))
+        self.prev_spectrum = ys
 
-        # 4. Detect a beat if current energy is significantly higher than the average
-        is_beat = bass_energy > average_energy * self.beat_detection_threshold
+        # 2. Dynamic Thresholding
+        self.odf_history.append(spectral_flux)
+        if len(self.odf_history) > self.odf_history_size:
+            self.odf_history.pop(0)
+        
+        if not self.odf_history:
+            return
+
+        # The threshold is based on the median of recent ODF values
+        median_odf = numpy.median(self.odf_history)
+        dynamic_threshold = (median_odf * self.dynamic_threshold_multiplier) + self.dynamic_threshold_offset
+
+        # 3. Peak Picking
+        # A beat is a peak in the ODF that is above the dynamic threshold
+        # To be a peak, it must be the maximum value in a small local window
+        is_peak = spectral_flux >= numpy.max(self.odf_history[-3:]) if len(self.odf_history) >= 3 else True
+        is_beat = spectral_flux > dynamic_threshold and is_peak
 
         if is_beat and (self.current_time - self.beat_time) > self.beat_refractory_period:
             self.beat_time = self.current_time
