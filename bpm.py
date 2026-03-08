@@ -54,16 +54,25 @@ class AudioAnalyzer:
         vu_level = min(100, int(volume / 100))
         self.callback_input_intensity_changed(vu_level)
 
-        # --- Enhanced Beat Detection using Spectral Flux ---
+        # --- Enhanced Beat Detection using Band-Limited Spectral Flux ---
+
+        # Focus on the rhythm section (0 - 1000 Hz) to reduce high-frequency noise
+        freq_mask = (xs <= 1000)
+        ys_band = ys[freq_mask]
 
         if self.prev_spectrum is None:
-            self.prev_spectrum = ys
+            self.prev_spectrum = ys_band
+            return
+        
+        # Ensure shapes match
+        if len(ys_band) != len(self.prev_spectrum):
+            self.prev_spectrum = ys_band
             return
 
         # 1. Calculate Onset Detection Function (ODF) using Spectral Flux
         # Spectral flux is the sum of positive changes in the spectrum magnitude
-        spectral_flux = numpy.sum(numpy.maximum(0, ys - self.prev_spectrum))
-        self.prev_spectrum = ys
+        spectral_flux = numpy.sum(numpy.maximum(0, ys_band - self.prev_spectrum))
+        self.prev_spectrum = ys_band
 
         # 2. Dynamic Thresholding
         self.odf_history.append(spectral_flux)
@@ -87,17 +96,29 @@ class AudioAnalyzer:
             self.beat_time = self.current_time
             self.beat_timestamps.append(self.beat_time)
 
-            if len(self.beat_timestamps) > 20:  # Keep last 20 beats for BPM calculation
+            # Keep more history for better stability
+            if len(self.beat_timestamps) > 32: 
                 self.beat_timestamps.pop(0)
 
-            if len(self.beat_timestamps) > 1:
-                # Calculate BPM from inter-beat intervals
-                ibis = numpy.diff(self.beat_timestamps)
-                avg_ibi = numpy.mean(ibis)
-                if avg_ibi > 0:
-                    bpm = 60 / avg_ibi
-                    # Clamp BPM to a reasonable range
-                    if 70 < bpm < 180:
+            if len(self.beat_timestamps) > 4:
+                # --- Robust BPM Calculation ---
+                intervals = numpy.diff(self.beat_timestamps)
+                
+                # Filter out unrealistic intervals (e.g. > 200 BPM or < 40 BPM)
+                # 200 BPM ~= 0.3s, 40 BPM ~= 1.5s
+                valid_intervals = intervals[(intervals > 0.3) & (intervals < 1.5)]
+                
+                if len(valid_intervals) > 2:
+                    # Use median to find the "center" of the distribution
+                    median_ibi = numpy.median(valid_intervals)
+                    
+                    # Filter intervals close to the median (within 15%)
+                    # This rejects outliers (missed beats or double hits)
+                    consistent_intervals = valid_intervals[numpy.abs(valid_intervals - median_ibi) < 0.15 * median_ibi]
+                    
+                    if len(consistent_intervals) > 0:
+                        avg_ibi = numpy.mean(consistent_intervals)
+                        bpm = 60 / avg_ibi
                         self.callback_beat_detected(self.beat_time, bpm)
 
     def on_beat_detected(self, callback):
