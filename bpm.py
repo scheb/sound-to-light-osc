@@ -44,8 +44,7 @@ class VuMeter(QObject):
 
     def __init__(self):
         super().__init__()
-        self.volume_history = []
-        self.history_size = 200  # ~4 seconds of history for dynamic scaling
+        self.volume_max = 1.0
 
     def update(self, audio_data):
         # Calculate the volume (RMS of the raw signal)
@@ -53,20 +52,10 @@ class VuMeter(QObject):
         if numpy.isnan(volume):
             volume = 0
 
-        # Add current volume to history
-        self.volume_history.append(volume)
-        if len(self.volume_history) > self.history_size:
-            self.volume_history.pop(0)
-
-        # Determine the maximum volume in the recent history
-        max_volume = numpy.max(self.volume_history)
-        
-        # Set a floor for the maximum to prevent division by zero and keep it responsive
-        # A raw RMS of 10000 is a reasonable "loud" reference.
-        max_volume = max(max_volume, 10000) 
+        self.volume_max = max(self.volume_max, volume)
 
         # Normalize the current volume against the dynamic maximum
-        vu_level = int((volume / max_volume) * 100)
+        vu_level = (volume / self.volume_max) * 100
         vu_level = min(100, vu_level)  # Ensure it's capped at 100
 
         self.vu_level_changed.emit(vu_level)
