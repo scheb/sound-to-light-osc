@@ -7,17 +7,39 @@ from time import perf_counter
 class VuMeter(QObject):
     vu_level_changed = pyqtSignal(int)
 
+    def __init__(self):
+        super().__init__()
+        self.volume_history = []
+        self.history_size = 200  # ~4 seconds of history for dynamic scaling
+
     def update(self, audio_data):
         # Calculate the volume (RMS of the raw signal)
         volume = numpy.sqrt(numpy.mean(audio_data**2))
         if numpy.isnan(volume):
             volume = 0
-        vu_level = min(100, int(volume / 100))
+
+        # Add current volume to history
+        self.volume_history.append(volume)
+        if len(self.volume_history) > self.history_size:
+            self.volume_history.pop(0)
+
+        # Determine the maximum volume in the recent history
+        max_volume = numpy.max(self.volume_history)
+        
+        # Set a floor for the maximum to prevent division by zero and keep it responsive
+        # A raw RMS of 10000 is a reasonable "loud" reference.
+        max_volume = max(max_volume, 10000) 
+
+        # Normalize the current volume against the dynamic maximum
+        vu_level = int((volume / max_volume) * 100)
+        vu_level = min(100, vu_level)  # Ensure it's capped at 100
+
         self.vu_level_changed.emit(vu_level)
         return volume
 
 class IntensityDetector(QObject):
     pause_detected = pyqtSignal()
+    new_song_detected = pyqtSignal()
     intensity_changed = pyqtSignal(int)
 
     def __init__(self):
@@ -25,6 +47,7 @@ class IntensityDetector(QObject):
         self.current_intensity = 0
         self.volume_long_history = []
         self.pause_counter = 0
+        self.is_paused = False
         
         # Intensity stability
         self.pending_intensity = 0
@@ -42,10 +65,14 @@ class IntensityDetector(QObject):
             if volume < 500:
                 self.pause_counter += 1
                 if self.pause_counter > 100:  # ~2 seconds of silence
-                    self.pause_detected.emit()
-                    self.pause_counter = 0
+                    if not self.is_paused:
+                        self.pause_detected.emit()
+                        self.is_paused = True
             else:
                 self.pause_counter = 0
+                if self.is_paused:
+                    self.is_paused = False
+                    self.new_song_detected.emit()
 
             # Detect Intensity
             current_avg_vol = numpy.mean(self.volume_long_history[-50:])
@@ -174,13 +201,13 @@ class SignalGenerator(QObject):
         if self.intensity == -1: modulo = 4
         if self.bpm > 0 and self.bpm < 100: modulo /= 2
         self.bar_modulo = numpy.max([1, modulo])
-        print("Bar modulo: {:.0f}".format(self.bar_modulo))
+        # print("Bar modulo: {:.0f}".format(self.bar_modulo))
 
     @pyqtSlot(float, float)
     def track_beat(self, beat_time, bpm):
         bpm_changed = False
         if abs(bpm - self.bpm) > 1:
-            print("BPM changed {:d} -> {:d}".format(int(self.bpm), int(bpm)))
+            # print("BPM changed {:d} -> {:d}".format(int(self.bpm), int(bpm)))
             self.bpm = bpm
             self.recalculate_bar_modulo()
             self.bpm_changed.emit(int(bpm))
@@ -188,12 +215,12 @@ class SignalGenerator(QObject):
 
         if self.auto_generating:
             if bpm_changed:
-                print("Sync auto generated beat")
-                self.timer.stop()
+                # print("Sync auto generated beat")
+                # self.timer.stop()
                 self.generate_beat_signal(beat_time=beat_time)
         else:
             if bpm_changed and self.can_auto_generate():
-                print("Start auto generating beat with {:d} BPM".format(int(self.bpm)))
+                # print("Start auto generating beat with {:d} BPM".format(int(self.bpm)))
                 self.auto_generating = True
             self.generate_beat_signal(beat_time=beat_time)
 
@@ -221,12 +248,13 @@ class SignalGenerator(QObject):
                 self.bar_detected.emit()
 
         if self.auto_generating:
-            self.timer = QTimer()
-            self.timer.setSingleShot(True)
-            self.timer.timeout.connect(self.generate_beat_signal)
-            time_passed = int((perf_counter() - beat_time) * 1000)
-            timeout = int(60000 / self.bpm) - time_passed
-            self.timer.start(timeout)
+            return False
+            # self.timer = QtCore.QTimer()
+            # self.timer.setSingleShot(True)
+            # self.timer.timeout.connect(self.generate_beat_signal)
+            # time_passed = int((perf_counter() - beat_time) * 1000)
+            # timeout = int(60000 / self.bpm) - time_passed
+            # self.timer.start(timeout)
 
     @pyqtSlot()
     def track_new_song(self):

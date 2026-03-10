@@ -41,6 +41,7 @@ class BeatDetector(QtCore.QObject):
         # Connect analysis components to signal generator
         self.audio_analyzer.beat_detector.beat_detected.connect(self.signal_generator.track_beat)
         self.audio_analyzer.intensity_detector.pause_detected.connect(self.signal_generator.track_pause)
+        self.audio_analyzer.intensity_detector.new_song_detected.connect(self.signal_generator.track_new_song)
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.signal_generator.track_intensity_change)
         
         # Connect signal generator to UI and OSC
@@ -59,7 +60,7 @@ class BeatDetector(QtCore.QObject):
         if self.change_program and self.current_program_beats >= self.min_program_beats:
             new_program = self.choose_program_by_intensity()
             if new_program != self.current_program:
-                print("Change program to {:d} for intensity {:d}".format(new_program, self.current_intensity))
+                # print("Change program to {:d} for intensity {:d}".format(new_program, self.current_intensity))
                 self.current_program = new_program
                 self.osc_client.send_prog_signal(new_program)
             self.current_program_beats = 1
