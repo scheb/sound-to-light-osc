@@ -23,8 +23,7 @@ class BeatDetector(QtCore.QObject):
         self.setup_signal_connections()
 
         self.timer = QtCore.QTimer()
-        self.timer.start(int(round(1000 / (180 / 60) / 16)))  # 180bpm / 16
-        # analyze_audio is called 16x faster than 180bpm
+        self.timer.start(int(round(20))) # 20ms
         self.timer.timeout.connect(self.audio_analyzer.analyze_audio)
         self.input_recorder.start()
 

@@ -187,8 +187,11 @@ class AudioAnalyzer(QObject):
         self.volume_normalizer = VolumeNormalizer()
 
     def analyze_audio(self):
-        if not self.input_recorder.has_new_audio: return
+        if not self.input_recorder.has_new_audio:
+            # print("no new data")
+            return
 
+        # print("NEW DATA")
         current_time = perf_counter()
         xs, ys = self.input_recorder.fft()
         ys = self.volume_normalizer.normalize_volume(ys)

@@ -1,7 +1,3 @@
-import sys
-
-import matplotlib
-matplotlib.use('TkAgg') # <-- THIS MAKES IT FAST!
 import numpy
 import pyaudio
 import threading
@@ -10,10 +6,13 @@ class InputRecorder:
     """Simple, cross-platform class to record from the default input device."""
 
     def __init__(self, beat_detector):
-        self.RATE = 44100
-        self.BUFFER_SIZE = 2 ** 10
+        # This value has to be aligned with consumption rate on the other end
+        # It has to be reasonable fast enough to detect desired BPM
+        self.sec_to_record = 0.02
 
-        self.sec_to_record = .1
+        self.RATE = 44100
+        self.BUFFER_SIZE = 882  # This equals 20ms at 44100Hz
+
         self.kill_threads = False
         self.has_new_audio = False
         self.beat_detector = beat_detector
@@ -24,6 +23,11 @@ class InputRecorder:
         self.samples_to_record = int(self.BUFFER_SIZE * self.buffers_to_record)
         self.chunks_to_record = int(self.samples_to_record / self.BUFFER_SIZE)
         self.sec_per_point = 1. / self.RATE
+        # print("Recorder config:")
+        # print(f"  sec_to_record {self.sec_to_record}")
+        # print(f"  buffers_to_record {self.buffers_to_record}")
+        # print(f"  samples_to_record {self.samples_to_record}")
+        # print(f"  chunks_to_record {self.chunks_to_record}")
 
         self.thread = None
         self.pyaudio = pyaudio.PyAudio()
