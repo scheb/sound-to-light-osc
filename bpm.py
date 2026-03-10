@@ -1,8 +1,43 @@
-from PyQt5.QtCore import QTimer, QObject, pyqtSignal, pyqtSlot
-import numpy
+from collections import deque
+
+from PyQt5 import QtCore
+from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 
 from recorder import *
 from time import perf_counter
+
+class VolumeNormalizer(QObject):
+    def __init__(self):
+        super().__init__()
+        self.raw_max_values = []
+        self.historic_max_values = deque(maxlen=300)
+        self.target_max = 1000.0
+        self.scale_factor = 1.0
+
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.update_scale_factor)
+        self.timer.start(1000)  # Update every second
+
+    def update_scale_factor(self):
+        if not self.raw_max_values:
+            return
+
+        # Find the maximum value in the last second and add it to the history
+        max_in_second = numpy.percentile(self.raw_max_values, 95)
+        self.raw_max_values = []
+        self.historic_max_values.append(max_in_second)
+
+        # The new scaling factor is based on the max value in the history
+        if self.historic_max_values:
+            max_overall = numpy.percentile(self.historic_max_values, 95)
+            # print(f"New max_overall {max_overall}")
+            if max_overall > 0:
+                self.scale_factor = self.target_max / max_overall
+
+    def normalize_volume(self, ys):
+        # Keep track of the max value in the raw signal
+        self.raw_max_values.append(numpy.percentile(ys, 95))
+        return ys * self.scale_factor
 
 class VuMeter(QObject):
     vu_level_changed = pyqtSignal(int)
@@ -160,12 +195,16 @@ class AudioAnalyzer(QObject):
         self.vu_meter = VuMeter()
         self.intensity_detector = IntensityDetector()
         self.beat_detector = BeatDetector()
+        self.volume_normalizer = VolumeNormalizer()
 
     def analyze_audio(self):
         if not self.input_recorder.has_new_audio: return
 
         current_time = perf_counter()
         xs, ys = self.input_recorder.fft()
+        ys = self.volume_normalizer.normalize_volume(ys)
+        # print(f"Max ys: {numpy.percentile(ys, 95)}")
+
         audio_data = self.input_recorder.audio.astype(numpy.float64)
         self.input_recorder.has_new_audio = False
 
