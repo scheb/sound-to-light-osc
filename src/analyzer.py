@@ -8,6 +8,7 @@ from time import perf_counter
 
 MAX_VOLUME = 1000.0
 
+
 class VolumeNormalizer(QObject):
     def __init__(self):
         super().__init__()
@@ -41,6 +42,7 @@ class VolumeNormalizer(QObject):
         self.raw_max_values.append(numpy.percentile(ys, 95))
         return ys * self.scale_factor
 
+
 class VuMeter(QObject):
     vu_level_changed = pyqtSignal(int)
 
@@ -50,7 +52,7 @@ class VuMeter(QObject):
 
     def update(self, audio_data):
         # Calculate the volume (RMS of the raw signal)
-        volume = numpy.sqrt(numpy.mean(audio_data**2))
+        volume = numpy.sqrt(numpy.mean(audio_data ** 2))
         if numpy.isnan(volume):
             volume = 0
 
@@ -63,6 +65,7 @@ class VuMeter(QObject):
         self.vu_level_changed.emit(vu_level)
         return volume
 
+
 class IntensityDetector(QObject):
     pause_detected = pyqtSignal()
     new_song_detected = pyqtSignal()
@@ -74,7 +77,7 @@ class IntensityDetector(QObject):
         self.volume_long_history = []
         self.pause_counter = 0
         self.is_paused = False
-        
+
         # Intensity stability
         self.pending_intensity = 0
         self.intensity_hold_counter = 0
@@ -102,27 +105,28 @@ class IntensityDetector(QObject):
 
             # Detect Intensity
             current_avg_vol = numpy.mean(self.volume_long_history[-50:])
-            
+
             detected_intensity = 0
             if current_avg_vol > avg_vol * 1.1 and current_avg_vol > 1000:
                 detected_intensity = 1  # Intense
             elif current_avg_vol < avg_vol * 0.9:
                 detected_intensity = -1  # Calm
-            
+
             if detected_intensity != self.current_intensity:
                 if detected_intensity == self.pending_intensity:
                     self.intensity_hold_counter += 1
                 else:
                     self.pending_intensity = detected_intensity
                     self.intensity_hold_counter = 0
-                
-                if self.intensity_hold_counter > 50: # ~1 second at 50Hz
+
+                if self.intensity_hold_counter > 50:  # ~1 second at 50Hz
                     self.current_intensity = detected_intensity
                     self.intensity_changed.emit(detected_intensity)
                     self.intensity_hold_counter = 0
             else:
                 self.intensity_hold_counter = 0
                 self.pending_intensity = None
+
 
 class BeatDetector(QObject):
     beat_detected = pyqtSignal(float, float)
@@ -168,15 +172,16 @@ class BeatDetector(QObject):
             if len(self.beat_timestamps) > 4:
                 intervals = numpy.diff(self.beat_timestamps)
                 valid_intervals = intervals[(intervals > 0.3) & (intervals < 1.5)]
-                
+
                 if len(valid_intervals) > 2:
                     median_ibi = numpy.median(valid_intervals)
                     consistent_intervals = valid_intervals[numpy.abs(valid_intervals - median_ibi) < 0.15 * median_ibi]
-                    
+
                     if len(consistent_intervals) > 0:
                         avg_ibi = numpy.mean(consistent_intervals)
                         bpm = 60 / avg_ibi
                         self.beat_detected.emit(self.beat_time, bpm)
+
 
 class NewSongDetector(QObject):
     new_song_detected = pyqtSignal()
@@ -245,13 +250,12 @@ class AudioAnalyzer(QObject):
         self.beat_detector.update(xs, ys, current_time)
 
 
-
 class SignalGenerator(QObject):
     bpm_changed = pyqtSignal(int)
     beat_signal = pyqtSignal(int)
     bar_detected = pyqtSignal()
     # new_song_detected = pyqtSignal()
-    
+
     def __init__(self) -> None:
         super().__init__()
         self.reset_tracking()

@@ -8,6 +8,7 @@ import ui
 from analyzer import SignalGenerator, AudioAnalyzer
 from recorder import *
 
+
 class BeatDetector(QtCore.QObject):
     def __init__(self, window) -> None:
         super().__init__()
@@ -23,7 +24,7 @@ class BeatDetector(QtCore.QObject):
         self.setup_signal_connections()
 
         self.timer = QtCore.QTimer()
-        self.timer.start(int(round(20))) # 20ms
+        self.timer.start(int(round(20)))  # 20ms
         self.timer.timeout.connect(self.audio_analyzer.analyze_audio)
         self.input_recorder.start()
 
@@ -42,7 +43,7 @@ class BeatDetector(QtCore.QObject):
         self.audio_analyzer.beat_detector.beat_detected.connect(self.signal_generator.track_beat)
         self.audio_analyzer.intensity_detector.pause_detected.connect(self.signal_generator.track_pause)
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.signal_generator.track_intensity_change)
-        
+
         # Connect signal generator to UI and OSC
         self.signal_generator.beat_signal.connect(self.on_beat)
         self.signal_generator.bar_detected.connect(self.on_bar)
@@ -50,10 +51,10 @@ class BeatDetector(QtCore.QObject):
 
         # Connect new song detector to UI
         self.audio_analyzer.new_song_detector.new_song_detected.connect(self.on_new_song)
-        
+
         # Connect intensity directly to the UI
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.on_intensity_change)
-        
+
         # Connect VU meter to UI
         self.audio_analyzer.vu_meter.vu_level_changed.connect(self.ui.display_input_intensity)
 
@@ -122,6 +123,7 @@ class BeatDetector(QtCore.QObject):
 
     def close(self):
         self.input_recorder.close()
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

@@ -2,6 +2,7 @@ import numpy
 import pyaudio
 import threading
 
+
 class InputRecorder:
     """Simple, cross-platform class to record from the default input device."""
 
@@ -37,7 +38,8 @@ class InputRecorder:
         num_devices = info.get('deviceCount')
         for i in range(0, num_devices):
             if (self.pyaudio.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
-                self.beat_detector.ui.add_audio_source(self.pyaudio.get_device_info_by_host_api_device_index(0, i).get('name'))
+                self.beat_detector.ui.add_audio_source(
+                    self.pyaudio.get_device_info_by_host_api_device_index(0, i).get('name'))
 
         # make sure the default input device is broadcasting the speaker output
         # there are a few ways to do this
@@ -61,7 +63,8 @@ class InputRecorder:
 
     def change_input(self, index):
         if index != self.actual_index:
-            print("Using input device : {:s}".format(self.pyaudio.get_device_info_by_host_api_device_index(0, index).get('name')))
+            print("Using input device : {:s}".format(
+                self.pyaudio.get_device_info_by_host_api_device_index(0, index).get('name')))
             self.in_stream = self.pyaudio.open(
                 format=pyaudio.paInt16,
                 channels=1,
@@ -81,7 +84,7 @@ class InputRecorder:
     def record(self):
         while not self.kill_threads:
             for i in range(self.chunks_to_record):
-                self.audio[i*self.BUFFER_SIZE:(i + 1) * self.BUFFER_SIZE] = self.get_audio()
+                self.audio[i * self.BUFFER_SIZE:(i + 1) * self.BUFFER_SIZE] = self.get_audio()
             self.has_new_audio = True
 
     def start(self):
