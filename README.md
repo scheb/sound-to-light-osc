@@ -23,16 +23,16 @@ Required modules
 Usage
 -----
 
-`python beatDetector.py`
+`python beat_detector.py`
 
 OSC Signals
 -----------
 
-OSC signals are sent to `localhost:7701`, can be changed in `beatDetector.py`.
+OSC signals are sent to `localhost:7701`, can be changed in `beat_detector.py`.
 
 - `/beat` is sent for every beat detected.
 - `/bar` is sent every to change the lighting scene.
-- `/prog1` - `/prog8` is sent to change lighting programs (available have to be configured in `beatDetector.py`)
+- `/prog1` - `/prog8` is sent to change lighting programs (available have to be configured in `beat_detector.py`)
 
 Contributing
 ------------
