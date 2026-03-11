@@ -6,12 +6,14 @@ from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from recorder import *
 from time import perf_counter
 
+MAX_VOLUME = 1000.0
+
 class VolumeNormalizer(QObject):
     def __init__(self):
         super().__init__()
         self.raw_max_values = []
         self.historic_max_values = deque(maxlen=300)
-        self.target_max = 1000.0
+        self.target_max = MAX_VOLUME
         self.scale_factor = 1.0
 
         self.timer = QtCore.QTimer(self)
@@ -176,11 +178,42 @@ class BeatDetector(QObject):
                         bpm = 60 / avg_ibi
                         self.beat_detected.emit(self.beat_time, bpm)
 
+class NewSongDetector(QObject):
+    new_song_detected = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        # Volume threshold is static due to normalization
+        self.volume_threshold = MAX_VOLUME * 0.005
+        self.low_avg_time = None
+        self.time_threshold_secs = 1.0
+
+    def detect_low_volume(self, avg_volume: float, current_time: float):
+        # Detect very low volume (to detect new track)
+        if avg_volume < self.volume_threshold:
+            if self.low_avg_time is None:
+                self.low_avg_time = current_time
+                return False
+        else:
+            self.low_avg_time = None
+            return False
+
+        # Reset tracking if intensity dropped significantly within time frame
+        if self.low_avg_time is not None and (current_time - self.low_avg_time) > self.time_threshold_secs:
+            # print("New song, reason: low avg timeout")
+            self.new_song_detected.emit()
+            return True
+
+        return False
+
+
 class AudioAnalyzer(QObject):
     def __init__(self, input_recorder):
         super().__init__()
         self.input_recorder = input_recorder
-        
+        self.max_volume = MAX_VOLUME * 0.05
+
+        self.new_song_detector = NewSongDetector()
         self.vu_meter = VuMeter()
         self.intensity_detector = IntensityDetector()
         self.beat_detector = BeatDetector()
@@ -195,7 +228,14 @@ class AudioAnalyzer(QObject):
         current_time = perf_counter()
         xs, ys = self.input_recorder.fft()
         ys = self.volume_normalizer.normalize_volume(ys)
-        # print(f"Max ys: {numpy.percentile(ys, 95)}")
+        ys_max = numpy.percentile(ys, 95)
+        ys_median = numpy.percentile(ys, 50)
+        # print(f"Median ys: {ys_median}")
+        # print(f"Max ys: {ys_max}")
+
+        if self.new_song_detector.detect_low_volume(ys_median, current_time):
+            # Don't do any analysis when low volume was detected
+            return
 
         audio_data = self.input_recorder.audio.astype(numpy.float64)
         self.input_recorder.has_new_audio = False
@@ -204,11 +244,13 @@ class AudioAnalyzer(QObject):
         self.intensity_detector.update(volume)
         self.beat_detector.update(xs, ys, current_time)
 
+
+
 class SignalGenerator(QObject):
     bpm_changed = pyqtSignal(int)
     beat_signal = pyqtSignal(int)
     bar_detected = pyqtSignal()
-    new_song_detected = pyqtSignal()
+    # new_song_detected = pyqtSignal()
     
     def __init__(self) -> None:
         super().__init__()
