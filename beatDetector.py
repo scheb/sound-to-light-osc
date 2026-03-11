@@ -5,7 +5,7 @@ from PyQt5.QtCore import pyqtSlot
 
 import osc
 import ui
-from bpm import SignalGenerator, AudioAnalyzer
+from analyzer import SignalGenerator, AudioAnalyzer
 from recorder import *
 
 class BeatDetector(QtCore.QObject):
