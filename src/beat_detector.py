@@ -8,6 +8,9 @@ import ui
 from analyzer import SignalGenerator, AudioAnalyzer
 from recorder import *
 
+# Seconds per sample
+SAMPLE_LENGTH_SECS = 0.04
+
 
 class BeatDetector(QtCore.QObject):
     def __init__(self, window) -> None:
@@ -17,14 +20,14 @@ class BeatDetector(QtCore.QObject):
         self.osc_client = osc.OscClient("localhost", 7701)
         self.auto_prog = False
 
-        self.input_recorder = InputRecorder(self)
+        self.input_recorder = InputRecorder(self, SAMPLE_LENGTH_SECS)
         self.audio_analyzer = AudioAnalyzer(self.input_recorder)
         self.signal_generator = SignalGenerator()
 
         self.setup_signal_connections()
 
         self.timer = QtCore.QTimer()
-        self.timer.start(int(round(20)))  # 20ms
+        self.timer.start(int(round(SAMPLE_LENGTH_SECS * 1000)))
         self.timer.timeout.connect(self.audio_analyzer.analyze_audio)
         self.input_recorder.start()
 
@@ -43,6 +46,9 @@ class BeatDetector(QtCore.QObject):
         self.audio_analyzer.beat_detector.beat_detected.connect(self.signal_generator.track_beat)
         self.audio_analyzer.intensity_detector.pause_detected.connect(self.signal_generator.track_pause)
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.signal_generator.track_intensity_change)
+
+        # Connect visualization
+        self.audio_analyzer.beat_detector.spectral_flux_updated.connect(self.ui.update_beat_plot)
 
         # Connect signal generator to UI and OSC
         self.signal_generator.beat_signal.connect(self.on_beat)

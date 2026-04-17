@@ -26,20 +26,20 @@ class VolumeNormalizer(QObject):
             return
 
         # Find the maximum value in the last second and add it to the history
-        max_in_second = numpy.percentile(self.raw_max_values, 95)
+        max_in_second = numpy.percentile(self.raw_max_values, 100)
         self.raw_max_values = []
         self.historic_max_values.append(max_in_second)
 
         # The new scaling factor is based on the max value in the history
         if self.historic_max_values:
-            max_overall = numpy.percentile(self.historic_max_values, 95)
+            max_overall = numpy.percentile(self.historic_max_values, 100)
             # print(f"New max_overall {max_overall}")
             if max_overall > 0:
                 self.scale_factor = self.target_max / max_overall
 
     def normalize_volume(self, ys):
         # Keep track of the max value in the raw signal
-        self.raw_max_values.append(numpy.percentile(ys, 95))
+        self.raw_max_values.append(numpy.percentile(ys, 100))
         return ys * self.scale_factor
 
 
@@ -134,6 +134,7 @@ class BeatDetector(QObject):
     Uses spectral flux (Onset Detection Function) to identify rhythmic peaks.
     """
     beat_detected = pyqtSignal(float, float)
+    spectral_flux_updated = pyqtSignal(float, float, bool)
 
     def __init__(self):
         super().__init__()
@@ -141,12 +142,12 @@ class BeatDetector(QObject):
         self.beat_refractory_period = 0.3
         self.prev_spectrum = None
         self.odf_history = []
-        self.odf_history_size = 50 # ~1sec at 0.02 sec buffer size
-        self.odf_frame_size = 10
+        self.odf_history_size = 500 # ~1sec at 0.02 sec buffer size
+        self.odf_frame_size = 10 # 0.2sec
         # Sensitivity multiplier for the dynamic threshold. Higher values make beat detection more restrictive (requires a stronger peak relative to the median).
-        self.dynamic_threshold_multiplier = 2.0
+        self.dynamic_threshold_multiplier = 1.8
         # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
-        self.dynamic_threshold_offset = 0.2
+        self.dynamic_threshold_offset = 0.1
 
     def update(self, xs, ys, current_time):
         """
@@ -170,8 +171,10 @@ class BeatDetector(QObject):
 
         # Maintain a short history of flux values for thresholding
         self.odf_history.append(spectral_flux)
-        if len(self.odf_history) > self.odf_history_size: self.odf_history.pop(0)
-        if not self.odf_history: return
+        if len(self.odf_history) > self.odf_history_size:
+            self.odf_history.pop(0)
+        else:
+            return
 
         # Dynamic thresholding based on local median flux to adapt to different track volumes/densities
         median_odf = numpy.median(self.odf_history)
@@ -181,16 +184,12 @@ class BeatDetector(QObject):
         is_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
         is_beat = spectral_flux > dynamic_threshold and is_peak
 
-        # Nothing detected
-        if not is_beat:
-            return
-
-        # Enforce refractory period and calculate BPM
-        if (current_time - self.beat_time) > self.beat_refractory_period:
+        if is_beat and (current_time - self.beat_time) > self.beat_refractory_period:
             self.beat_detected.emit(self.beat_time, 120)
-            print(f"BEAT! {current_time}")
         else:
-            print("rejected beat")
+            is_beat = False
+
+        # self.spectral_flux_updated.emit(spectral_flux, dynamic_threshold, is_beat)
 
 
 class NewSongDetector(QObject):
@@ -243,7 +242,7 @@ class AudioAnalyzer(QObject):
         current_time = perf_counter()
         xs, ys = self.input_recorder.fft()
         ys = self.volume_normalizer.normalize_volume(ys)
-        ys_max = numpy.percentile(ys, 95)
+        # ys_max = numpy.percentile(ys, 99)
         ys_median = numpy.percentile(ys, 50)
         # print(f"Median ys: {ys_median}")
         # print(f"Max ys: {ys_max}")

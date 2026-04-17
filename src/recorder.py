@@ -1,3 +1,5 @@
+import math
+
 import numpy
 import pyaudio
 import threading
@@ -6,13 +8,13 @@ import threading
 class InputRecorder:
     """Simple, cross-platform class to record from the default input device."""
 
-    def __init__(self, beat_detector):
+    def __init__(self, beat_detector, sec_to_record):
         # This value has to be aligned with consumption rate on the other end
         # It has to be reasonable fast enough to detect desired BPM
-        self.sec_to_record = 0.02
+        self.sec_to_record = sec_to_record
 
         self.RATE = 44100
-        self.BUFFER_SIZE = 882  # This equals 20ms at 44100Hz
+        self.BUFFER_SIZE = math.floor(self.RATE * self.sec_to_record)
 
         self.kill_threads = False
         self.has_new_audio = False
