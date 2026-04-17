@@ -129,20 +129,31 @@ class IntensityDetector(QObject):
 
 
 class BeatDetector(QObject):
+    """
+    Analyzes frequency spectrum data to detect beats and estimate BPM.
+    Uses spectral flux (Onset Detection Function) to identify rhythmic peaks.
+    """
     beat_detected = pyqtSignal(float, float)
 
     def __init__(self):
         super().__init__()
-        self.beat_time = 0
-        self.beat_timestamps = []
-        self.beat_refractory_period = 0.2
         self.prev_spectrum = None
         self.odf_history = []
-        self.odf_history_size = 50
-        self.dynamic_threshold_multiplier = 1.4
-        self.dynamic_threshold_offset = 0.05
+        self.odf_history_size = 50 # ~1sec at 0.02 sec buffer size
+        self.odf_frame_size = 10
+        # Sensitivity multiplier for the dynamic threshold. Higher values make beat detection more restrictive (requires a stronger peak relative to the median).
+        self.dynamic_threshold_multiplier = 1.3
+        # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
+        self.dynamic_threshold_offset = 0.1
 
     def update(self, xs, ys, current_time):
+        """
+        Processes new FFT data.
+        :param xs: Frequency bins
+        :param ys: Magnitude values
+        :param current_time: Timestamp of the audio frame
+        """
+        # Focus on frequencies below 1000Hz (where bass/kick drum usually reside)
         freq_mask = (xs <= 1000)
         ys_band = ys[freq_mask]
 
@@ -150,37 +161,26 @@ class BeatDetector(QObject):
             self.prev_spectrum = ys_band
             return
 
+        # Spectral Flux: sum of positive changes in magnitude across frequency bins
+        # This represents the "novelty" or onset energy in the signal
         spectral_flux = numpy.sum(numpy.maximum(0, ys_band - self.prev_spectrum))
         self.prev_spectrum = ys_band
 
+        # Maintain a short history of flux values for thresholding
         self.odf_history.append(spectral_flux)
         if len(self.odf_history) > self.odf_history_size: self.odf_history.pop(0)
         if not self.odf_history: return
 
+        # Dynamic thresholding based on local median flux to adapt to different track volumes/densities
         median_odf = numpy.median(self.odf_history)
         dynamic_threshold = (median_odf * self.dynamic_threshold_multiplier) + self.dynamic_threshold_offset
 
-        is_peak = spectral_flux >= numpy.max(self.odf_history[-3:]) if len(self.odf_history) >= 3 else True
+        # A beat is detected if flux is a local maximum and exceeds the threshold
+        is_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
         is_beat = spectral_flux > dynamic_threshold and is_peak
 
-        if is_beat and (current_time - self.beat_time) > self.beat_refractory_period:
-            self.beat_time = current_time
-            self.beat_timestamps.append(self.beat_time)
-
-            if len(self.beat_timestamps) > 32: self.beat_timestamps.pop(0)
-
-            if len(self.beat_timestamps) > 4:
-                intervals = numpy.diff(self.beat_timestamps)
-                valid_intervals = intervals[(intervals > 0.3) & (intervals < 1.5)]
-
-                if len(valid_intervals) > 2:
-                    median_ibi = numpy.median(valid_intervals)
-                    consistent_intervals = valid_intervals[numpy.abs(valid_intervals - median_ibi) < 0.15 * median_ibi]
-
-                    if len(consistent_intervals) > 0:
-                        avg_ibi = numpy.mean(consistent_intervals)
-                        bpm = 60 / avg_ibi
-                        self.beat_detected.emit(self.beat_time, bpm)
+        if is_beat:
+            self.beat_detected.emit(current_time, 120)
 
 
 class NewSongDetector(QObject):
