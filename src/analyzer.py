@@ -137,14 +137,16 @@ class BeatDetector(QObject):
 
     def __init__(self):
         super().__init__()
+        self.beat_time = 0.0
+        self.beat_refractory_period = 0.3
         self.prev_spectrum = None
         self.odf_history = []
         self.odf_history_size = 50 # ~1sec at 0.02 sec buffer size
         self.odf_frame_size = 10
         # Sensitivity multiplier for the dynamic threshold. Higher values make beat detection more restrictive (requires a stronger peak relative to the median).
-        self.dynamic_threshold_multiplier = 1.3
+        self.dynamic_threshold_multiplier = 2.0
         # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
-        self.dynamic_threshold_offset = 0.1
+        self.dynamic_threshold_offset = 0.2
 
     def update(self, xs, ys, current_time):
         """
@@ -179,8 +181,16 @@ class BeatDetector(QObject):
         is_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
         is_beat = spectral_flux > dynamic_threshold and is_peak
 
-        if is_beat:
-            self.beat_detected.emit(current_time, 120)
+        # Nothing detected
+        if not is_beat:
+            return
+
+        # Enforce refractory period and calculate BPM
+        if (current_time - self.beat_time) > self.beat_refractory_period:
+            self.beat_detected.emit(self.beat_time, 120)
+            print(f"BEAT! {current_time}")
+        else:
+            print("rejected beat")
 
 
 class NewSongDetector(QObject):
@@ -282,24 +292,25 @@ class SignalGenerator(QObject):
 
     @pyqtSlot(float, float)
     def track_beat(self, beat_time, bpm):
-        bpm_changed = False
-        if abs(bpm - self.bpm) > 1:
-            # print("BPM changed {:d} -> {:d}".format(int(self.bpm), int(bpm)))
-            self.bpm = bpm
-            self.recalculate_bar_modulo()
-            self.bpm_changed.emit(int(bpm))
-            bpm_changed = True
-
-        if self.auto_generating:
-            if bpm_changed:
-                # print("Sync auto generated beat")
-                # self.timer.stop()
-                self.generate_beat_signal(beat_time=beat_time)
-        else:
-            if bpm_changed and self.can_auto_generate():
-                # print("Start auto generating beat with {:d} BPM".format(int(self.bpm)))
-                self.auto_generating = True
-            self.generate_beat_signal(beat_time=beat_time)
+        self.generate_beat_signal(beat_time=beat_time)
+        # bpm_changed = False
+        # if abs(bpm - self.bpm) > 1:
+        #     # print("BPM changed {:d} -> {:d}".format(int(self.bpm), int(bpm)))
+        #     self.bpm = bpm
+        #     self.recalculate_bar_modulo()
+        #     self.bpm_changed.emit(int(bpm))
+        #     bpm_changed = True
+        #
+        # if self.auto_generating:
+        #     if bpm_changed:
+        #         # print("Sync auto generated beat")
+        #         # self.timer.stop()
+        #         self.generate_beat_signal(beat_time=beat_time)
+        # else:
+        #     if bpm_changed and self.can_auto_generate():
+        #         # print("Start auto generating beat with {:d} BPM".format(int(self.bpm)))
+        #         self.auto_generating = True
+        #     self.generate_beat_signal(beat_time=beat_time)
 
     def can_auto_generate(self):
         if self.bpm > 0 and len(self.last_beats) >= 8:
@@ -310,28 +321,30 @@ class SignalGenerator(QObject):
         return False
 
     def generate_beat_signal(self, beat_time=None):
-        if beat_time is None: beat_time = perf_counter()
+        self.beat_signal.emit(1)
 
-        if beat_time - self.last_beat_time > 0.333:
-            self.last_beats.append(beat_time)
-            if len(self.last_beats) > 8: self.last_beats.pop(0)
-            self.last_beat_time = beat_time
-            self.beat_index += 1
-
-            beat_index_mod = self.beat_index % (self.bar_modulo * 2)
-            if self.beat_index % 2 == 0:
-                self.beat_signal.emit(int(beat_index_mod / 2))
-            if beat_index_mod == 0:
-                self.bar_detected.emit()
-
-        if self.auto_generating:
-            return False
-            # self.timer = QtCore.QTimer()
-            # self.timer.setSingleShot(True)
-            # self.timer.timeout.connect(self.generate_beat_signal)
-            # time_passed = int((perf_counter() - beat_time) * 1000)
-            # timeout = int(60000 / self.bpm) - time_passed
-            # self.timer.start(timeout)
+        # if beat_time is None: beat_time = perf_counter()
+        #
+        # if beat_time - self.last_beat_time > 0.333:
+        #     self.last_beats.append(beat_time)
+        #     if len(self.last_beats) > 8: self.last_beats.pop(0)
+        #     self.last_beat_time = beat_time
+        #     self.beat_index += 1
+        #
+        #     beat_index_mod = self.beat_index % (self.bar_modulo * 2)
+        #     if self.beat_index % 2 == 0:
+        #         self.beat_signal.emit(int(beat_index_mod / 2))
+        #     if beat_index_mod == 0:
+        #         self.bar_detected.emit()
+        #
+        # if self.auto_generating:
+        #     return False
+        #     # self.timer = QtCore.QTimer()
+        #     # self.timer.setSingleShot(True)
+        #     # self.timer.timeout.connect(self.generate_beat_signal)
+        #     # time_passed = int((perf_counter() - beat_time) * 1000)
+        #     # timeout = int(60000 / self.bpm) - time_passed
+        #     # self.timer.start(timeout)
 
     @pyqtSlot()
     def track_new_song(self):
