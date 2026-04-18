@@ -9,7 +9,7 @@ from analyzer import SignalGenerator, AudioAnalyzer
 from recorder import *
 
 # Seconds per sample
-SAMPLE_LENGTH_SECS = 0.04
+SAMPLE_LENGTH_SECS = 0.02
 
 
 class BeatDetector(QtCore.QObject):

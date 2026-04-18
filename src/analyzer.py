@@ -113,18 +113,20 @@ class BeatDetector(QObject):
     beat_detected = pyqtSignal(float, float)
     spectral_flux_updated = pyqtSignal(float, float, bool)
 
-    def __init__(self):
+    def __init__(self, sample_length_secs):
         super().__init__()
-        self.beat_time = 0.0
-        self.beat_refractory_period = 0.3
+        self.sample_length_secs = sample_length_secs
+        self.last_beat_time = 0.0
+        self.beat_refractory_period = 0.333  # ~180bpm
         self.prev_spectrum = None
         self.odf_history = []
-        self.odf_history_size = 500 # ~1sec at 0.02 sec buffer size
-        self.odf_frame_size = 10 # 0.2sec
+        self.odf_history_size = int(60 / sample_length_secs) # 60secs history
+        self.odf_frame_size = math.floor(0.4 / sample_length_secs) # 0.4sec evaluation frame
+        self.odf_min_history_size = self.odf_frame_size * 10
         # Sensitivity multiplier for the dynamic threshold. Higher values make beat detection more restrictive (requires a stronger peak relative to the median).
-        self.dynamic_threshold_multiplier = 1.8
+        self.dynamic_threshold_multiplier = 1.5
         # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
-        self.dynamic_threshold_offset = 0.1
+        self.dynamic_threshold_offset = 200 # 1000max
 
     def update(self, xs, ys, current_time):
         """
@@ -135,22 +137,26 @@ class BeatDetector(QObject):
         """
         # Focus on frequencies below 1000Hz (where bass/kick drum usually reside)
         freq_mask = (xs <= 1000)
-        ys_band = ys[freq_mask]
+        bass_band = ys[freq_mask]
 
-        if self.prev_spectrum is None or len(ys_band) != len(self.prev_spectrum):
-            self.prev_spectrum = ys_band
+        if self.prev_spectrum is None or len(bass_band) != len(self.prev_spectrum):
+            self.prev_spectrum = bass_band
             return
 
         # Spectral Flux: sum of positive changes in magnitude across frequency bins
         # This represents the "novelty" or onset energy in the signal
-        spectral_flux = numpy.sum(numpy.maximum(0, ys_band - self.prev_spectrum))
-        self.prev_spectrum = ys_band
+        spectral_flux = numpy.sum(numpy.maximum(0, bass_band - self.prev_spectrum))
+        self.prev_spectrum = bass_band
 
-        # Maintain a short history of flux values for thresholding
-        self.odf_history.append(spectral_flux)
-        if len(self.odf_history) > self.odf_history_size:
-            self.odf_history.pop(0)
-        else:
+        # Ignore silence for history to maintain threshold while no song is playing
+        if spectral_flux > self.dynamic_threshold_offset:
+            # Maintain a history of flux values for thresholding
+            self.odf_history.append(spectral_flux)
+            if len(self.odf_history) > self.odf_history_size:
+                self.odf_history.pop(0)
+
+        # Wait until we have enough history data before starting with beat detection
+        if len(self.odf_history) < self.odf_min_history_size:
             return
 
         # Dynamic thresholding based on local median flux to adapt to different track volumes/densities
@@ -158,8 +164,9 @@ class BeatDetector(QObject):
         dynamic_threshold = (median_odf * self.dynamic_threshold_multiplier) + self.dynamic_threshold_offset
 
         # A beat is detected if flux is a local maximum and exceeds the threshold
-        is_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
-        is_beat = spectral_flux > dynamic_threshold and is_peak
+        # is_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
+        # is_beat = spectral_flux > dynamic_threshold and is_peak
+        is_beat = spectral_flux > dynamic_threshold
 
         if is_beat and (current_time - self.beat_time) > self.beat_refractory_period:
             self.beat_detected.emit(self.beat_time, 120)
