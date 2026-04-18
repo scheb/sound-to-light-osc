@@ -21,7 +21,7 @@ class BeatDetector(QtCore.QObject):
         self.auto_prog = False
 
         self.input_recorder = InputRecorder(self, SAMPLE_LENGTH_SECS)
-        self.audio_analyzer = AudioAnalyzer(self.input_recorder)
+        self.audio_analyzer = AudioAnalyzer(self.input_recorder, SAMPLE_LENGTH_SECS)
         self.signal_generator = SignalGenerator()
 
         self.setup_signal_connections()
@@ -60,9 +60,6 @@ class BeatDetector(QtCore.QObject):
 
         # Connect intensity directly to the UI
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.on_intensity_change)
-
-        # Connect VU meter to UI
-        self.audio_analyzer.vu_meter.vu_level_changed.connect(self.ui.display_input_intensity)
 
     def change_program_if_needed(self):
         if self.change_program and self.current_program_beats >= self.min_program_beats:

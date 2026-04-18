@@ -43,29 +43,6 @@ class VolumeNormalizer(QObject):
         return ys * self.scale_factor
 
 
-class VuMeter(QObject):
-    vu_level_changed = pyqtSignal(int)
-
-    def __init__(self):
-        super().__init__()
-        self.volume_max = 1.0
-
-    def update(self, audio_data):
-        # Calculate the volume (RMS of the raw signal)
-        volume = numpy.sqrt(numpy.mean(audio_data ** 2))
-        if numpy.isnan(volume):
-            volume = 0
-
-        self.volume_max = max(self.volume_max, volume)
-
-        # Normalize the current volume against the dynamic maximum
-        vu_level = (volume / self.volume_max) * 100
-        vu_level = min(100, vu_level)  # Ensure it's capped at 100
-
-        self.vu_level_changed.emit(vu_level)
-        return volume
-
-
 class IntensityDetector(QObject):
     pause_detected = pyqtSignal()
     new_song_detected = pyqtSignal()
@@ -222,41 +199,45 @@ class NewSongDetector(QObject):
 
 
 class AudioAnalyzer(QObject):
-    def __init__(self, input_recorder):
+    def __init__(self, input_recorder, sample_length_secs):
         super().__init__()
         self.input_recorder = input_recorder
         self.max_volume = MAX_VOLUME * 0.05
 
         self.new_song_detector = NewSongDetector()
-        self.vu_meter = VuMeter()
         self.intensity_detector = IntensityDetector()
-        self.beat_detector = BeatDetector()
+        self.beat_detector = BeatDetector(sample_length_secs)
         self.volume_normalizer = VolumeNormalizer()
 
     def analyze_audio(self):
         if not self.input_recorder.has_new_audio:
-            # print("no new data")
+            print(f"WARNING: No new audio data available")
             return
 
-        # print("NEW DATA")
+        # Fetch raw data
         current_time = perf_counter()
         xs, ys = self.input_recorder.fft()
-        ys = self.volume_normalizer.normalize_volume(ys)
-        # ys_max = numpy.percentile(ys, 99)
-        ys_median = numpy.percentile(ys, 50)
-        # print(f"Median ys: {ys_median}")
-        # print(f"Max ys: {ys_max}")
-
-        if self.new_song_detector.detect_low_volume(ys_median, current_time):
-            # Don't do any analysis when low volume was detected
-            return
-
         audio_data = self.input_recorder.audio.astype(numpy.float64)
         self.input_recorder.has_new_audio = False
 
-        volume = self.vu_meter.update(audio_data)
-        self.intensity_detector.update(volume)
+        # Normalize volume data
+        ys = self.volume_normalizer.normalize_volume(ys)
+        # ys_median = numpy.percentile(ys, 50)
+        # ys_max = numpy.percentile(ys, 100)
+        # print(f"Median ys: {ys_median}")
+        # print(f"Max ys: {ys_max}")
+
+        # if self.new_song_detector.detect_low_volume(ys_median, current_time):
+        #     # Don't do any analysis when low volume was detected
+        #     print("low volume")
+        #     return
+
+        # self.intensity_detector.update(volume)
         self.beat_detector.update(xs, ys, current_time)
+
+        run_time = perf_counter() - current_time
+        if run_time > self.input_recorder.sec_per_buffer:
+            print(f"WARNING: Analyzer runtime exceeds sampling period: {run_time} > {self.input_recorder.sec_per_buffer}")
 
 
 class SignalGenerator(QObject):

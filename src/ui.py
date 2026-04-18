@@ -52,15 +52,8 @@ class UserInterface(object):
         self.input_combobox.setObjectName("auto_prog_button")
         self.input_combobox.activated.connect(self.callback_input_changed)
 
-        self.input_intensity = QtWidgets.QProgressBar(central_widget)
-        self.input_intensity.setStyleSheet("QProgressBar { border: 2px solid grey; border-radius: 0px; text-align: center; } QProgressBar::chunk {background-color: #3add36; width: 1px;}")
-        self.input_intensity.setTextVisible(False)
-        self.input_intensity.setFixedHeight(15)
-        self.input_intensity.setValue(0)
-
         vertical_layout_input.addWidget(self.input_label)
         vertical_layout_input.addWidget(self.input_combobox)
-        vertical_layout_input.addWidget(self.input_intensity)
         vertical_layout.addWidget(input_widget)
 
         self.auto_prog_button = QtWidgets.QPushButton(central_widget)
@@ -138,9 +131,6 @@ class UserInterface(object):
 
     def select_audio_source(self, index):
         self.input_combobox.setCurrentIndex(index)
-
-    def display_input_intensity(self, level):
-        self.input_intensity.setValue(level)
 
     def update_beat_plot(self, flux, threshold, is_beat):
         self.flux_data = np.roll(self.flux_data, -1)
