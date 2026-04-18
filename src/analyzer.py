@@ -252,100 +252,23 @@ class SignalGenerator(QObject):
     bpm_changed = pyqtSignal(int)
     beat_signal = pyqtSignal(int)
     bar_detected = pyqtSignal()
-    # new_song_detected = pyqtSignal()
+    new_song_detected = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
-        self.reset_tracking()
-
-    def reset_tracking(self):
-        self.bar_modulo = 2
-        self.beat_index = -1
-        self.auto_generating = False
-        self.bpm = 0
-        self.intensity = 0
-        self.last_beat_time = 0
-        self.last_beats = []
-
-    def reset_beat_index(self):
-        self.beat_index = -1
-
-    def recalculate_bar_modulo(self):
-        modulo = 2
-        if self.intensity == 1: modulo = 1
-        if self.intensity == -1: modulo = 4
-        if self.bpm > 0 and self.bpm < 100: modulo /= 2
-        self.bar_modulo = numpy.max([1, modulo])
-        # print("Bar modulo: {:.0f}".format(self.bar_modulo))
 
     @pyqtSlot(float)
     def track_beat(self, beat_time):
-        self.generate_beat_signal(beat_time=beat_time)
-        # bpm_changed = False
-        # if abs(bpm - self.bpm) > 1:
-        #     # print("BPM changed {:d} -> {:d}".format(int(self.bpm), int(bpm)))
-        #     self.bpm = bpm
-        #     self.recalculate_bar_modulo()
-        #     self.bpm_changed.emit(int(bpm))
-        #     bpm_changed = True
-        #
-        # if self.auto_generating:
-        #     if bpm_changed:
-        #         # print("Sync auto generated beat")
-        #         # self.timer.stop()
-        #         self.generate_beat_signal(beat_time=beat_time)
-        # else:
-        #     if bpm_changed and self.can_auto_generate():
-        #         # print("Start auto generating beat with {:d} BPM".format(int(self.bpm)))
-        #         self.auto_generating = True
-        #     self.generate_beat_signal(beat_time=beat_time)
-
-    def can_auto_generate(self):
-        if self.bpm > 0 and len(self.last_beats) >= 8:
-            oldest_beat = numpy.min(self.last_beats)
-            newest_beat = numpy.max(self.last_beats)
-            max_difference = 60 / self.bpm * 16
-            return newest_beat - oldest_beat < max_difference
-        return False
-
-    def generate_beat_signal(self, beat_time=None):
-        self.beat_signal.emit(1)
-
-        # if beat_time is None: beat_time = perf_counter()
-        #
-        # if beat_time - self.last_beat_time > 0.333:
-        #     self.last_beats.append(beat_time)
-        #     if len(self.last_beats) > 8: self.last_beats.pop(0)
-        #     self.last_beat_time = beat_time
-        #     self.beat_index += 1
-        #
-        #     beat_index_mod = self.beat_index % (self.bar_modulo * 2)
-        #     if self.beat_index % 2 == 0:
-        #         self.beat_signal.emit(int(beat_index_mod / 2))
-        #     if beat_index_mod == 0:
-        #         self.bar_detected.emit()
-        #
-        # if self.auto_generating:
-        #     return False
-        #     # self.timer = QtCore.QTimer()
-        #     # self.timer.setSingleShot(True)
-        #     # self.timer.timeout.connect(self.generate_beat_signal)
-        #     # time_passed = int((perf_counter() - beat_time) * 1000)
-        #     # timeout = int(60000 / self.bpm) - time_passed
-        #     # self.timer.start(timeout)
+        self.beat_signal.emit(0)
 
     @pyqtSlot()
     def track_new_song(self):
         self.new_song_detected.emit()
-        self.reset_tracking()
 
     @pyqtSlot()
     def track_pause(self):
-        if hasattr(self, 'timer'): self.timer.stop()
-        self.auto_generating = False
-        self.reset_beat_index()
+        pass
 
     @pyqtSlot(int)
     def track_intensity_change(self, intensity):
         self.intensity = intensity
-        self.recalculate_bar_modulo()
