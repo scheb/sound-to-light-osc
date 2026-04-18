@@ -25,7 +25,7 @@ class UserInterface(object):
 
     def setup_ui(self, win_plot):
         win_plot.setObjectName("win_plot")
-        win_plot.resize(400, 600)
+        win_plot.resize(400, 400)
         central_widget = QtWidgets.QWidget(win_plot)
         vertical_layout = QtWidgets.QVBoxLayout(central_widget)
 
@@ -41,8 +41,12 @@ class UserInterface(object):
         self.threshold_curve = self.plot_widget.plot(pen=pg.mkPen('y', width=1))
         vertical_layout.addWidget(self.plot_widget)
 
+        self.beat_label = QtWidgets.QLabel(central_widget)
+        self.beat_label.setObjectName("lbl_beat")
+        self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
+        vertical_layout.addWidget(self.beat_label)
+
         input_widget = QtWidgets.QWidget(win_plot)
-        input_widget.setFixedHeight(95)
         vertical_layout_input = QtWidgets.QVBoxLayout(input_widget)
 
         self.input_label = QtWidgets.QLabel(central_widget)
@@ -66,11 +70,6 @@ class UserInterface(object):
         self.intensity_label.setObjectName("lbl_intensity")
         self.intensity_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
         vertical_layout.addWidget(self.intensity_label)
-
-        self.beat_label = QtWidgets.QLabel(central_widget)
-        self.beat_label.setObjectName("lbl_beat")
-        self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
-        vertical_layout.addWidget(self.beat_label)
 
         self.bar_label = QtWidgets.QLabel(central_widget)
         self.bar_label.setObjectName("lbl_bar")
