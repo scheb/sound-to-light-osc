@@ -121,8 +121,7 @@ class BeatDetector(QObject):
         self.prev_spectrum = None
         self.odf_history = []
         self.odf_history_size = int(60 / sample_length_secs) # 60secs history
-        self.odf_frame_size = math.floor(0.4 / sample_length_secs) # 0.4sec evaluation frame
-        self.odf_min_history_size = self.odf_frame_size * 10
+        self.odf_min_history_size = int(10 / sample_length_secs) # 10secs min history
         # Sensitivity multiplier for the dynamic threshold. Higher values make beat detection more restrictive (requires a stronger peak relative to the median).
         self.dynamic_threshold_multiplier = 1.5
         # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
@@ -163,11 +162,11 @@ class BeatDetector(QObject):
         median_odf = numpy.median(self.odf_history)
         dynamic_threshold = (median_odf * self.dynamic_threshold_multiplier) + self.dynamic_threshold_offset
 
-        # A beat is detected if flux is a local maximum and exceeds the threshold
-        is_local_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
-        is_beat = spectral_flux > dynamic_threshold and is_local_peak
+        # A beat is detected if flux exceeds the threshold
+        is_beat = spectral_flux > dynamic_threshold
 
         if is_beat:
+            # Refractory period skips too many beats close to another
             if (current_time - self.last_beat_time) > self.beat_refractory_period:
                 self.beat_detected.emit(current_time)
                 self.last_beat_time = current_time
