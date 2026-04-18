@@ -110,7 +110,7 @@ class BeatDetector(QObject):
     Analyzes frequency spectrum data to detect beats and estimate BPM.
     Uses spectral flux (Onset Detection Function) to identify rhythmic peaks.
     """
-    beat_detected = pyqtSignal(float, float)
+    beat_detected = pyqtSignal(float)
     spectral_flux_updated = pyqtSignal(float, float, bool)
 
     def __init__(self, sample_length_secs):
@@ -164,13 +164,12 @@ class BeatDetector(QObject):
         dynamic_threshold = (median_odf * self.dynamic_threshold_multiplier) + self.dynamic_threshold_offset
 
         # A beat is detected if flux is a local maximum and exceeds the threshold
-        # is_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
-        # is_beat = spectral_flux > dynamic_threshold and is_peak
-        is_beat = spectral_flux > dynamic_threshold
+        is_local_peak = spectral_flux >= numpy.max(self.odf_history[-self.odf_frame_size:]) if len(self.odf_history) >= self.odf_frame_size else True
+        is_beat = spectral_flux > dynamic_threshold and is_local_peak
 
         if is_beat:
             if (current_time - self.last_beat_time) > self.beat_refractory_period:
-                self.beat_detected.emit(current_time, 120)
+                self.beat_detected.emit(current_time)
                 self.last_beat_time = current_time
             else:
                 is_beat = False
@@ -279,8 +278,8 @@ class SignalGenerator(QObject):
         self.bar_modulo = numpy.max([1, modulo])
         # print("Bar modulo: {:.0f}".format(self.bar_modulo))
 
-    @pyqtSlot(float, float)
-    def track_beat(self, beat_time, bpm):
+    @pyqtSlot(float)
+    def track_beat(self, beat_time):
         self.generate_beat_signal(beat_time=beat_time)
         # bpm_changed = False
         # if abs(bpm - self.bpm) > 1:
