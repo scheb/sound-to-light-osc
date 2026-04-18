@@ -9,7 +9,7 @@ class UserInterface(object):
     intensity_label: QLabel
     beat_label: QLabel
     bar_label: QLabel
-    colorsList = ["#f58231", "#ffe119", "#bfef45", "#3cb44b", "#42d4f4", "#4363d8", "#f032e6"]
+    colorsList = [("#ffffff", "#000000"), ("#000000", "#ffffff")]
     beat_color_index = 0
     bar_color_index = 0
     chart_x_size = 200
@@ -36,9 +36,9 @@ class UserInterface(object):
         self.plot_widget.setXRange(0, self.chart_x_size)
         self.plot_widget.hideAxis('bottom')
         self.plot_widget.setFixedHeight(150)
+        self.beat_curve = self.plot_widget.plot(pen=pg.mkPen('r', width=1))
         self.flux_curve = self.plot_widget.plot(pen=pg.mkPen('c', width=1))
         self.threshold_curve = self.plot_widget.plot(pen=pg.mkPen('y', width=1))
-        self.beat_curve = self.plot_widget.plot(pen=pg.mkPen('r', width=1))
         vertical_layout.addWidget(self.plot_widget)
 
         input_widget = QtWidgets.QWidget(win_plot)
@@ -99,13 +99,13 @@ class UserInterface(object):
 
     def change_beat_button_color(self):
         self.beat_color_index += 1
-        color = self.colorsList[self.beat_color_index % len(self.colorsList)]
-        self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: {:s}; font-size: 18pt".format(color))
+        (bgColor, fontColor) = self.colorsList[self.beat_color_index % len(self.colorsList)]
+        self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: {:s}; font-size: 18pt; color: {:s}".format(bgColor, fontColor))
 
     def change_bar_button_color(self):
         self.bar_color_index += 1
-        color = self.colorsList[self.bar_color_index % len(self.colorsList)]
-        self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: {:s}; font-size: 18pt".format(color))
+        (bgColor, fontColor) = self.colorsList[self.bar_color_index % len(self.colorsList)]
+        self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: {:s}; font-size: 18pt; color: {:s}".format(bgColor, fontColor))
 
     def display_intensity(self, intensity):
         if intensity == 1:
