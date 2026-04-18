@@ -168,10 +168,12 @@ class BeatDetector(QObject):
         # is_beat = spectral_flux > dynamic_threshold and is_peak
         is_beat = spectral_flux > dynamic_threshold
 
-        if is_beat and (current_time - self.beat_time) > self.beat_refractory_period:
-            self.beat_detected.emit(self.beat_time, 120)
-        else:
-            is_beat = False
+        if is_beat:
+            if (current_time - self.last_beat_time) > self.beat_refractory_period:
+                self.beat_detected.emit(current_time, 120)
+                self.last_beat_time = current_time
+            else:
+                is_beat = False
 
         self.spectral_flux_updated.emit(spectral_flux, dynamic_threshold, is_beat)
 
