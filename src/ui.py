@@ -1,6 +1,6 @@
 import numpy as np
 import pyqtgraph as pg
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QPushButton, QLabel
 
 
@@ -9,16 +9,18 @@ class UserInterface(object):
     intensity_label: QLabel
     beat_label: QLabel
     bar_label: QLabel
-    colorsList = ["#a9a9a9", "#f58231", "#ffe119", "#bfef45", "#3cb44b", "#42d4f4", "#4363d8", "#f032e6"]
+    colorsList = ["#f58231", "#ffe119", "#bfef45", "#3cb44b", "#42d4f4", "#4363d8", "#f032e6"]
     beat_color_index = 0
     bar_color_index = 0
+    chart_x_size = 200
+    chart_y_size = 2500
 
     def __init__(self, auto_prog_callback, callback_input_changed):
         self.callback_auto_prog_clicked = auto_prog_callback
         self.callback_input_changed = callback_input_changed
-        self.flux_data = np.zeros(100)
-        self.threshold_data = np.zeros(100)
-        self.beat_data = np.zeros(100)
+        self.flux_data = np.zeros(self.chart_x_size)
+        self.threshold_data = np.zeros(self.chart_x_size)
+        self.beat_data = np.zeros(self.chart_x_size)
         self.beat_markers = []
 
     def setup_ui(self, win_plot):
@@ -30,8 +32,8 @@ class UserInterface(object):
         # Plot Widget for Beat Detection Visualization
         self.plot_widget = pg.PlotWidget(central_widget)
         self.plot_widget.setBackground('k')
-        self.plot_widget.setYRange(0, 3000)
-        self.plot_widget.setXRange(0, 100)
+        self.plot_widget.setYRange(0, self.chart_y_size)
+        self.plot_widget.setXRange(0, self.chart_x_size)
         self.plot_widget.hideAxis('bottom')
         self.plot_widget.setFixedHeight(150)
         self.flux_curve = self.plot_widget.plot(pen=pg.mkPen('c', width=1))
@@ -146,16 +148,8 @@ class UserInterface(object):
         self.threshold_data = np.roll(self.threshold_data, -1)
         self.threshold_data[-1] = threshold
         self.beat_data = np.roll(self.beat_data, -1)
-        self.beat_data[-1] = 9999999 if is_beat else 0
+        self.beat_data[-1] = self.chart_y_size*2 if is_beat else 0
 
         self.flux_curve.setData(self.flux_data)
         self.threshold_curve.setData(self.threshold_data)
         self.beat_curve.setData(self.beat_data)
-
-        # if is_beat:
-        #     line = pg.InfiniteLine(pos=99, angle=90, pen=pg.mkPen('r', width=1))
-        #     self.plot_widget.addItem(line)
-        #     self.beat_markers.append(line)
-        #     # Since markers move with the data, we'd need a more complex way to keep them
-        #     # For now, just showing the current beat trigger on the right edge.
-        pass

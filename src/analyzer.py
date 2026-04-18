@@ -189,7 +189,7 @@ class BeatDetector(QObject):
         else:
             is_beat = False
 
-        # self.spectral_flux_updated.emit(spectral_flux, dynamic_threshold, is_beat)
+        self.spectral_flux_updated.emit(spectral_flux, dynamic_threshold, is_beat)
 
 
 class NewSongDetector(QObject):
