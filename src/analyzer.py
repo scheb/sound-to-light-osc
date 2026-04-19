@@ -223,8 +223,9 @@ class AudioAnalyzer(QObject):
         # Normalize volume data
         ys = self.volume_normalizer.normalize_volume(ys)
 
-        # Use peak magnitude for volume-based detectors
-        peak_volume = numpy.max(ys)
+        # 5 second training period for the volume normalizer until analyzing starts
+        if current_time < 5.0:
+            return
 
         # Update sub-components
         self.beat_detector.update(xs, ys, current_time)
