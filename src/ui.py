@@ -3,6 +3,8 @@ import pyqtgraph as pg
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QPushButton, QLabel
 
+from analyzer import SpectralFluxIntensityDetector
+
 
 class UserInterface(object):
     auto_prog_button: QPushButton
@@ -13,7 +15,8 @@ class UserInterface(object):
     beat_color_index = 0
     bar_color_index = 0
     chart_x_size = 200
-    chart_y_size = 2500
+    beat_chart_y_size = 2000
+    intensity_chart_y_size = 1500
 
     def __init__(self, auto_prog_callback, callback_input_changed):
         self.callback_auto_prog_clicked = auto_prog_callback
@@ -34,7 +37,7 @@ class UserInterface(object):
         # Plot Widget for Beat Detection Visualization
         self.beat_plot = pg.PlotWidget(central_widget)
         self.beat_plot.setBackground('k')
-        self.beat_plot.setYRange(0, self.chart_y_size)
+        self.beat_plot.setYRange(0, self.beat_chart_y_size)
         self.beat_plot.setXRange(0, self.chart_x_size)
         self.beat_plot.hideAxis('bottom')
         self.beat_plot.setFixedHeight(150)
@@ -51,13 +54,15 @@ class UserInterface(object):
         # Plot Widget for Intensity Visualization
         self.intensity_plot = pg.PlotWidget(central_widget)
         self.intensity_plot.setBackground('k')
-        self.intensity_plot.setYRange(0, self.chart_y_size)
+        self.intensity_plot.setYRange(0, self.intensity_chart_y_size)
         self.intensity_plot.setXRange(0, self.chart_x_size)
         self.intensity_plot.hideAxis('bottom')
         self.intensity_plot.setFixedHeight(150)
         self.intensity_change_curve = self.intensity_plot.plot(pen=pg.mkPen('r', width=1))
         self.intensity_flux_curve = self.intensity_plot.plot(pen=pg.mkPen('c', width=1))
         self.intensity_threshold_curve = self.intensity_plot.plot(pen=pg.mkPen('y', width=1))
+        self.intensity_threshold_high_curve = self.intensity_plot.plot(pen=pg.mkPen('#ffff0070', width=1))
+        self.intensity_threshold_low_curve = self.intensity_plot.plot(pen=pg.mkPen('#ffff0070', width=1))
         vertical_layout.addWidget(self.intensity_plot)
 
         input_widget = QtWidgets.QWidget(win_plot)
@@ -153,7 +158,7 @@ class UserInterface(object):
         self.beat_threshold_data = np.roll(self.beat_threshold_data, -1)
         self.beat_threshold_data[-1] = threshold
         self.beat_data = np.roll(self.beat_data, -1)
-        self.beat_data[-1] = self.chart_y_size*2 if is_beat else 0
+        self.beat_data[-1] = self.beat_chart_y_size*2 if is_beat else 0
 
         self.beat_flux_curve.setData(self.beat_flux_data)
         self.beat_threshold_curve.setData(self.beat_threshold_data)
@@ -165,8 +170,10 @@ class UserInterface(object):
         self.intensity_threshold_data = np.roll(self.intensity_threshold_data, -1)
         self.intensity_threshold_data[-1] = threshold
         self.intensity_change_data = np.roll(self.intensity_change_data, -1)
-        self.intensity_change_data[-1] = self.chart_y_size*2 if is_change else 0
+        self.intensity_change_data[-1] = self.intensity_chart_y_size*2 if is_change else 0
 
         self.intensity_flux_curve.setData(self.intensity_flux_data)
         self.intensity_threshold_curve.setData(self.intensity_threshold_data)
+        self.intensity_threshold_high_curve.setData(self.intensity_threshold_data * SpectralFluxIntensityDetector.UPPER_THRESHOLD_MULTIPLIER)
+        self.intensity_threshold_low_curve.setData(self.intensity_threshold_data * SpectralFluxIntensityDetector.LOWER_THRESHOLD_MULTIPLIER)
         self.intensity_change_curve.setData(self.intensity_change_data)

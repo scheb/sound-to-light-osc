@@ -10,10 +10,10 @@ MAX_VOLUME = 1000.0
 
 
 class VolumeNormalizer(QObject):
-    def __init__(self):
+    def __init__(self, sample_length_secs):
         super().__init__()
         self.raw_max_values = []
-        self.historic_max_values = deque(maxlen=300)
+        self.historic_max_values = deque(maxlen=int(60 / sample_length_secs)) # 60 seconds
         self.target_max = MAX_VOLUME
         self.scale_factor = 1.0
 
@@ -46,17 +46,23 @@ class VolumeNormalizer(QObject):
 class SpectralFluxIntensityDetector(QObject):
     intensity_changed = pyqtSignal(int)  # -1: Calm, 0: Normal, 1: Intense
     spectral_flux_updated = pyqtSignal(float, float, bool)
+    INTENSITY_NORMAL = 0
+    INTENSITY_INTENSE = 1
+    INTENSITY_CALM = -1
+    UPPER_THRESHOLD_MULTIPLIER = 1.3
+    LOWER_THRESHOLD_MULTIPLIER = 0.7
 
-    def __init__(self):
+    def __init__(self, sample_length_secs):
         super().__init__()
         self.current_intensity = 0
-        self.flux_history = deque(maxlen=1500)  # ~30 seconds at 50Hz
+        self.flux_history = deque(maxlen=int(60 / sample_length_secs))  # 60 seconds
+        self.flux_min_history = int(5 / sample_length_secs) # 5secs min history
+        self.flux_evaluation_frame = int(1 / sample_length_secs) # 1sec
         self.prev_spectrum = None
 
         # Stability logic
         self.pending_intensity = 0
         self.intensity_hold_counter = 0
-        self.MIN_HISTORY = 250  # ~5 seconds
 
     def update(self, xs, ys, current_time: float):
         # Calculate spectral flux for the whole spectrum
@@ -69,19 +75,18 @@ class SpectralFluxIntensityDetector(QObject):
 
         self.flux_history.append(spectral_flux)
 
-        if len(self.flux_history) < self.MIN_HISTORY:
+        if len(self.flux_history) < self.flux_min_history:
             return
 
-        avg_flux = numpy.mean(self.flux_history)
-        # Look at the last 1 second (50 samples at 50Hz)
-        recent_flux = numpy.mean(list(self.flux_history)[-50:])
+        avg_flux = numpy.median(self.flux_history)
+        recent_flux = numpy.median(list(self.flux_history)[-self.flux_evaluation_frame:])
 
         # Determine intensity relative to the moving average
-        detected_intensity = 0
-        if recent_flux > avg_flux * 1.5:  # Higher multiplier for flux as it's more sensitive
-            detected_intensity = 1  # Intense
-        elif recent_flux < avg_flux * 0.5:  # Lower multiplier for calm
-            detected_intensity = -1  # Calm
+        detected_intensity = self.INTENSITY_NORMAL
+        if recent_flux > avg_flux * self.UPPER_THRESHOLD_MULTIPLIER:
+            detected_intensity = self.INTENSITY_INTENSE
+        elif recent_flux < avg_flux * self.LOWER_THRESHOLD_MULTIPLIER:
+            detected_intensity = self.INTENSITY_CALM
 
         # Require stability before switching
         is_intensity_change = False
@@ -94,8 +99,7 @@ class SpectralFluxIntensityDetector(QObject):
 
             if self.intensity_hold_counter > 50:  # ~1 second stability
                 self.current_intensity = detected_intensity
-                # self.intensity_changed.emit(detected_intensity)
-                print("SpectralFluxIntensity: {:d}", detected_intensity)
+                self.intensity_changed.emit(detected_intensity)
                 is_intensity_change = True
                 self.intensity_hold_counter = 0
         else:
@@ -119,9 +123,8 @@ class BeatDetector(QObject):
         self.last_beat_time = 0.0
         self.beat_refractory_period = 0.333  # ~180bpm
         self.prev_spectrum = None
-        self.odf_history = []
-        self.odf_history_size = int(60 / sample_length_secs) # 60secs history
-        self.odf_min_history_size = int(10 / sample_length_secs) # 10secs min history
+        self.odf_history = deque(maxlen=int(60 / sample_length_secs))  # 60 seconds
+        self.odf_min_history_size = int(5 / sample_length_secs) # 5secs min history
         # Sensitivity multiplier for the dynamic threshold. Higher values make beat detection more restrictive (requires a stronger peak relative to the median).
         self.dynamic_threshold_multiplier = 1.5
         # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
@@ -151,8 +154,6 @@ class BeatDetector(QObject):
         if spectral_flux > self.dynamic_threshold_offset:
             # Maintain a history of flux values for thresholding
             self.odf_history.append(spectral_flux)
-            if len(self.odf_history) > self.odf_history_size:
-                self.odf_history.pop(0)
 
         # Wait until we have enough history data before starting with beat detection
         if len(self.odf_history) < self.odf_min_history_size:
@@ -206,9 +207,9 @@ class AudioAnalyzer(QObject):
     def __init__(self, input_recorder, sample_length_secs):
         super().__init__()
         self.input_recorder = input_recorder
-        self.volume_normalizer = VolumeNormalizer()
+        self.volume_normalizer = VolumeNormalizer(sample_length_secs)
         self.beat_detector = BeatDetector(sample_length_secs)
-        self.intensity_detector = SpectralFluxIntensityDetector()
+        self.intensity_detector = SpectralFluxIntensityDetector(sample_length_secs)
         self.new_song_detector = NewSongDetector()
 
     def analyze_audio(self):
