@@ -122,8 +122,10 @@ class UserInterface(object):
         self.bar_label.setText("BPM: {:d}".format(int(bpm)))
 
     def display_new_song(self):
-        self.beat_label.setText("Beat")
-        self.bar_label.setText("BPM: New song")
+        self.beat_label.setText("Beat: New song")
+
+    def display_pause(self):
+        self.beat_label.setText("Beat: Pause")
 
     def add_audio_source(self, text):
         self.input_combobox.addItem(text)

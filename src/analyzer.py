@@ -178,43 +178,37 @@ class BeatDetector(QObject):
 
 class NewSongDetector(QObject):
     new_song_detected = pyqtSignal()
+    pause_detected = pyqtSignal()
 
     def __init__(self):
         super().__init__()
-        # Volume threshold is static due to normalization
-        self.volume_threshold = MAX_VOLUME * 0.005
-        self.low_avg_time = None
-        self.time_threshold_secs = 1.0
+        self.volume_threshold = MAX_VOLUME * 0.05 # 5% threshold
+        self.is_silence = False
+        self.silence_start_time = None
+        self.silence_duration_threshold = 1.0 # seconds
 
-    def detect_low_volume(self, avg_volume: float, current_time: float):
-        # Detect very low volume (to detect new track)
-        if avg_volume < self.volume_threshold:
-            if self.low_avg_time is None:
-                self.low_avg_time = current_time
-                return False
+    def update(self, peak_volume: float, current_time: float):
+        if peak_volume < self.volume_threshold:
+            if self.silence_start_time is None:
+                self.silence_start_time = current_time
+            elif not self.is_silence and (current_time - self.silence_start_time) > self.silence_duration_threshold:
+                self.is_silence = True
+                self.pause_detected.emit()
         else:
-            self.low_avg_time = None
-            return False
-
-        # Reset tracking if intensity dropped significantly within time frame
-        if self.low_avg_time is not None and (current_time - self.low_avg_time) > self.time_threshold_secs:
-            # print("New song, reason: low avg timeout")
-            self.new_song_detected.emit()
-            return True
-
-        return False
+            if self.is_silence:
+                self.new_song_detected.emit()
+                self.is_silence = False
+            self.silence_start_time = None
 
 
 class AudioAnalyzer(QObject):
     def __init__(self, input_recorder, sample_length_secs):
         super().__init__()
         self.input_recorder = input_recorder
-        self.max_volume = MAX_VOLUME * 0.05
-
-        self.new_song_detector = NewSongDetector()
-        self.intensity_detector = IntensityDetector()
-        self.beat_detector = BeatDetector(sample_length_secs)
         self.volume_normalizer = VolumeNormalizer()
+        self.beat_detector = BeatDetector(sample_length_secs)
+        self.intensity_detector = IntensityDetector()
+        self.new_song_detector = NewSongDetector()
 
     def analyze_audio(self):
         if not self.input_recorder.has_new_audio:
@@ -224,27 +218,22 @@ class AudioAnalyzer(QObject):
         # Fetch raw data
         current_time = perf_counter()
         xs, ys = self.input_recorder.fft()
-        audio_data = self.input_recorder.audio.astype(numpy.float64)
         self.input_recorder.has_new_audio = False
 
         # Normalize volume data
         ys = self.volume_normalizer.normalize_volume(ys)
-        # ys_median = numpy.percentile(ys, 50)
-        # ys_max = numpy.percentile(ys, 100)
-        # print(f"Median ys: {ys_median}")
-        # print(f"Max ys: {ys_max}")
 
-        # if self.new_song_detector.detect_low_volume(ys_median, current_time):
-        #     # Don't do any analysis when low volume was detected
-        #     print("low volume")
-        #     return
+        # Use peak magnitude for volume-based detectors
+        peak_volume = numpy.max(ys)
 
-        # self.intensity_detector.update(volume)
+        # Update sub-components
         self.beat_detector.update(xs, ys, current_time)
+        self.new_song_detector.update(peak_volume, current_time)
 
+        # Performance monitoring
         run_time = perf_counter() - current_time
         if run_time > self.input_recorder.sec_per_buffer:
-            print(f"WARNING: Analyzer runtime exceeds sampling period: {run_time} > {self.input_recorder.sec_per_buffer}")
+            print(f"WARNING: Analyzer runtime exceeds sampling period: {run_time:.4f} > {self.input_recorder.sec_per_buffer:.4f}")
 
 
 class SignalGenerator(QObject):

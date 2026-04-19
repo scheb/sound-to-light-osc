@@ -57,6 +57,7 @@ class BeatDetector(QtCore.QObject):
 
         # Connect new song detector to UI
         self.audio_analyzer.new_song_detector.new_song_detected.connect(self.on_new_song)
+        self.audio_analyzer.new_song_detector.pause_detected.connect(self.on_pause)
 
         # Connect intensity directly to the UI
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.on_intensity_change)
@@ -112,6 +113,10 @@ class BeatDetector(QtCore.QObject):
     def on_new_song(self):
         self.change_program = True
         self.ui.display_new_song()
+
+    @pyqtSlot()
+    def on_pause(self):
+        self.ui.display_pause()
 
     @pyqtSlot(int)
     def on_bpm_change(self, bpm):
