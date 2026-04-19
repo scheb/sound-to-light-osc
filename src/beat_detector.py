@@ -44,11 +44,12 @@ class BeatDetector(QtCore.QObject):
     def setup_signal_connections(self):
         # Connect analysis components to signal generator
         self.audio_analyzer.beat_detector.beat_detected.connect(self.signal_generator.track_beat)
-        self.audio_analyzer.intensity_detector.pause_detected.connect(self.signal_generator.track_pause)
+        self.audio_analyzer.new_song_detector.pause_detected.connect(self.signal_generator.track_pause)
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.signal_generator.track_intensity_change)
 
         # Connect visualization
         self.audio_analyzer.beat_detector.spectral_flux_updated.connect(self.ui.update_beat_plot)
+        self.audio_analyzer.intensity_detector.spectral_flux_updated.connect(self.ui.update_intensity_plot)
 
         # Connect signal generator to UI and OSC
         self.signal_generator.beat_signal.connect(self.on_beat)

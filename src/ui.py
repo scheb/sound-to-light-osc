@@ -18,10 +18,12 @@ class UserInterface(object):
     def __init__(self, auto_prog_callback, callback_input_changed):
         self.callback_auto_prog_clicked = auto_prog_callback
         self.callback_input_changed = callback_input_changed
-        self.flux_data = np.zeros(self.chart_x_size)
-        self.threshold_data = np.zeros(self.chart_x_size)
+        self.beat_flux_data = np.zeros(self.chart_x_size)
+        self.beat_threshold_data = np.zeros(self.chart_x_size)
         self.beat_data = np.zeros(self.chart_x_size)
-        self.beat_markers = []
+        self.intensity_flux_data = np.zeros(self.chart_x_size)
+        self.intensity_threshold_data = np.zeros(self.chart_x_size)
+        self.intensity_change_data = np.zeros(self.chart_x_size)
 
     def setup_ui(self, win_plot):
         win_plot.setObjectName("win_plot")
@@ -30,21 +32,33 @@ class UserInterface(object):
         vertical_layout = QtWidgets.QVBoxLayout(central_widget)
 
         # Plot Widget for Beat Detection Visualization
-        self.plot_widget = pg.PlotWidget(central_widget)
-        self.plot_widget.setBackground('k')
-        self.plot_widget.setYRange(0, self.chart_y_size)
-        self.plot_widget.setXRange(0, self.chart_x_size)
-        self.plot_widget.hideAxis('bottom')
-        self.plot_widget.setFixedHeight(150)
-        self.beat_curve = self.plot_widget.plot(pen=pg.mkPen('r', width=1))
-        self.flux_curve = self.plot_widget.plot(pen=pg.mkPen('c', width=1))
-        self.threshold_curve = self.plot_widget.plot(pen=pg.mkPen('y', width=1))
-        vertical_layout.addWidget(self.plot_widget)
+        self.beat_plot = pg.PlotWidget(central_widget)
+        self.beat_plot.setBackground('k')
+        self.beat_plot.setYRange(0, self.chart_y_size)
+        self.beat_plot.setXRange(0, self.chart_x_size)
+        self.beat_plot.hideAxis('bottom')
+        self.beat_plot.setFixedHeight(150)
+        self.beat_curve = self.beat_plot.plot(pen=pg.mkPen('r', width=1))
+        self.beat_flux_curve = self.beat_plot.plot(pen=pg.mkPen('c', width=1))
+        self.beat_threshold_curve = self.beat_plot.plot(pen=pg.mkPen('y', width=1))
+        vertical_layout.addWidget(self.beat_plot)
 
         self.beat_label = QtWidgets.QLabel(central_widget)
         self.beat_label.setObjectName("lbl_beat")
         self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
         vertical_layout.addWidget(self.beat_label)
+
+        # Plot Widget for Intensity Visualization
+        self.intensity_plot = pg.PlotWidget(central_widget)
+        self.intensity_plot.setBackground('k')
+        self.intensity_plot.setYRange(0, self.chart_y_size)
+        self.intensity_plot.setXRange(0, self.chart_x_size)
+        self.intensity_plot.hideAxis('bottom')
+        self.intensity_plot.setFixedHeight(150)
+        self.intensity_change_curve = self.intensity_plot.plot(pen=pg.mkPen('r', width=1))
+        self.intensity_flux_curve = self.intensity_plot.plot(pen=pg.mkPen('c', width=1))
+        self.intensity_threshold_curve = self.intensity_plot.plot(pen=pg.mkPen('y', width=1))
+        vertical_layout.addWidget(self.intensity_plot)
 
         input_widget = QtWidgets.QWidget(win_plot)
         vertical_layout_input = QtWidgets.QVBoxLayout(input_widget)
@@ -134,13 +148,25 @@ class UserInterface(object):
         self.input_combobox.setCurrentIndex(index)
 
     def update_beat_plot(self, flux, threshold, is_beat):
-        self.flux_data = np.roll(self.flux_data, -1)
-        self.flux_data[-1] = flux
-        self.threshold_data = np.roll(self.threshold_data, -1)
-        self.threshold_data[-1] = threshold
+        self.beat_flux_data = np.roll(self.beat_flux_data, -1)
+        self.beat_flux_data[-1] = flux
+        self.beat_threshold_data = np.roll(self.beat_threshold_data, -1)
+        self.beat_threshold_data[-1] = threshold
         self.beat_data = np.roll(self.beat_data, -1)
         self.beat_data[-1] = self.chart_y_size*2 if is_beat else 0
 
-        self.flux_curve.setData(self.flux_data)
-        self.threshold_curve.setData(self.threshold_data)
+        self.beat_flux_curve.setData(self.beat_flux_data)
+        self.beat_threshold_curve.setData(self.beat_threshold_data)
         self.beat_curve.setData(self.beat_data)
+
+    def update_intensity_plot(self, flux, threshold, is_change):
+        self.intensity_flux_data = np.roll(self.intensity_flux_data, -1)
+        self.intensity_flux_data[-1] = flux
+        self.intensity_threshold_data = np.roll(self.intensity_threshold_data, -1)
+        self.intensity_threshold_data[-1] = threshold
+        self.intensity_change_data = np.roll(self.intensity_change_data, -1)
+        self.intensity_change_data[-1] = self.chart_y_size*2 if is_change else 0
+
+        self.intensity_flux_curve.setData(self.intensity_flux_data)
+        self.intensity_threshold_curve.setData(self.intensity_threshold_data)
+        self.intensity_change_curve.setData(self.intensity_change_data)

@@ -43,66 +43,66 @@ class VolumeNormalizer(QObject):
         return ys * self.scale_factor
 
 
-class IntensityDetector(QObject):
-    pause_detected = pyqtSignal()
-    new_song_detected = pyqtSignal()
-    intensity_changed = pyqtSignal(int)
+class SpectralFluxIntensityDetector(QObject):
+    intensity_changed = pyqtSignal(int)  # -1: Calm, 0: Normal, 1: Intense
+    spectral_flux_updated = pyqtSignal(float, float, bool)
 
     def __init__(self):
         super().__init__()
         self.current_intensity = 0
-        self.volume_long_history = []
-        self.pause_counter = 0
-        self.is_paused = False
+        self.flux_history = deque(maxlen=1500)  # ~30 seconds at 50Hz
+        self.prev_spectrum = None
 
-        # Intensity stability
+        # Stability logic
         self.pending_intensity = 0
         self.intensity_hold_counter = 0
+        self.MIN_HISTORY = 250  # ~5 seconds
 
-    def update(self, volume):
-        self.volume_long_history.append(volume)
-        if len(self.volume_long_history) > 1500:  # ~30 seconds history for a very stable baseline
-            self.volume_long_history.pop(0)
+    def update(self, xs, ys):
+        # Calculate spectral flux for the whole spectrum
+        if self.prev_spectrum is None or len(ys) != len(self.prev_spectrum):
+            self.prev_spectrum = ys
+            return
 
-        if len(self.volume_long_history) > 50:
-            avg_vol = numpy.mean(self.volume_long_history)
+        spectral_flux = numpy.sum(numpy.maximum(0, ys - self.prev_spectrum))
+        self.prev_spectrum = ys
 
-            # Detect Pause/Silence
-            if volume < 500:
-                self.pause_counter += 1
-                if self.pause_counter > 100:  # ~2 seconds of silence
-                    if not self.is_paused:
-                        self.pause_detected.emit()
-                        self.is_paused = True
+        self.flux_history.append(spectral_flux)
+
+        if len(self.flux_history) < self.MIN_HISTORY:
+            return
+
+        avg_flux = numpy.mean(self.flux_history)
+        # Look at the last 1 second (50 samples at 50Hz)
+        recent_flux = numpy.mean(list(self.flux_history)[-50:])
+
+        # Determine intensity relative to the moving average
+        detected_intensity = 0
+        if recent_flux > avg_flux * 1.5:  # Higher multiplier for flux as it's more sensitive
+            detected_intensity = 1  # Intense
+        elif recent_flux < avg_flux * 0.5:  # Lower multiplier for calm
+            detected_intensity = -1  # Calm
+
+        # Require stability before switching
+        is_intensity_change = False
+        if detected_intensity != self.current_intensity:
+            if detected_intensity == self.pending_intensity:
+                self.intensity_hold_counter += 1
             else:
-                self.pause_counter = 0
-                if self.is_paused:
-                    self.is_paused = False
-                    self.new_song_detected.emit()
-
-            # Detect Intensity
-            current_avg_vol = numpy.mean(self.volume_long_history[-50:])
-
-            detected_intensity = 0
-            if current_avg_vol > avg_vol * 1.1 and current_avg_vol > 1000:
-                detected_intensity = 1  # Intense
-            elif current_avg_vol < avg_vol * 0.9:
-                detected_intensity = -1  # Calm
-
-            if detected_intensity != self.current_intensity:
-                if detected_intensity == self.pending_intensity:
-                    self.intensity_hold_counter += 1
-                else:
-                    self.pending_intensity = detected_intensity
-                    self.intensity_hold_counter = 0
-
-                if self.intensity_hold_counter > 50:  # ~1 second at 50Hz
-                    self.current_intensity = detected_intensity
-                    self.intensity_changed.emit(detected_intensity)
-                    self.intensity_hold_counter = 0
-            else:
+                self.pending_intensity = detected_intensity
                 self.intensity_hold_counter = 0
-                self.pending_intensity = None
+
+            if self.intensity_hold_counter > 50:  # ~1 second stability
+                self.current_intensity = detected_intensity
+                # self.intensity_changed.emit(detected_intensity)
+                print("SpectralFluxIntensity: {:d}", detected_intensity)
+                is_intensity_change = True
+                self.intensity_hold_counter = 0
+        else:
+            self.intensity_hold_counter = 0
+            self.pending_intensity = None
+
+        self.spectral_flux_updated.emit(recent_flux, avg_flux, is_intensity_change)
 
 
 class BeatDetector(QObject):
@@ -207,7 +207,7 @@ class AudioAnalyzer(QObject):
         self.input_recorder = input_recorder
         self.volume_normalizer = VolumeNormalizer()
         self.beat_detector = BeatDetector(sample_length_secs)
-        self.intensity_detector = IntensityDetector()
+        self.intensity_detector = SpectralFluxIntensityDetector()
         self.new_song_detector = NewSongDetector()
 
     def analyze_audio(self):
@@ -228,6 +228,7 @@ class AudioAnalyzer(QObject):
 
         # Update sub-components
         self.beat_detector.update(xs, ys, current_time)
+        self.intensity_detector.update(xs, ys)
         self.new_song_detector.update(peak_volume, current_time)
 
         # Performance monitoring
