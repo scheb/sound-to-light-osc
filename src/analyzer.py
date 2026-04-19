@@ -58,7 +58,7 @@ class SpectralFluxIntensityDetector(QObject):
         self.intensity_hold_counter = 0
         self.MIN_HISTORY = 250  # ~5 seconds
 
-    def update(self, xs, ys):
+    def update(self, xs, ys, current_time: float):
         # Calculate spectral flux for the whole spectrum
         if self.prev_spectrum is None or len(ys) != len(self.prev_spectrum):
             self.prev_spectrum = ys
@@ -127,7 +127,7 @@ class BeatDetector(QObject):
         # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
         self.dynamic_threshold_offset = 200 # 1000max
 
-    def update(self, xs, ys, current_time):
+    def update(self, xs, ys, current_time: float):
         """
         Processes new FFT data.
         :param xs: Frequency bins
@@ -187,7 +187,8 @@ class NewSongDetector(QObject):
         self.silence_start_time = None
         self.silence_duration_threshold = 1.0 # seconds
 
-    def update(self, peak_volume: float, current_time: float):
+    def update(self, xs, ys, current_time: float):
+        peak_volume = numpy.max(ys)
         if peak_volume < self.volume_threshold:
             if self.silence_start_time is None:
                 self.silence_start_time = current_time
@@ -229,8 +230,8 @@ class AudioAnalyzer(QObject):
 
         # Update sub-components
         self.beat_detector.update(xs, ys, current_time)
-        self.intensity_detector.update(xs, ys)
-        self.new_song_detector.update(peak_volume, current_time)
+        self.intensity_detector.update(xs, ys, current_time)
+        self.new_song_detector.update(xs, ys, current_time)
 
         # Performance monitoring
         run_time = perf_counter() - current_time
