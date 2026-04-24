@@ -26,6 +26,8 @@ class UserInterface(object):
         self.beat_data = np.zeros(self.chart_x_size)
         self.intensity_flux_data = np.zeros(self.chart_x_size)
         self.intensity_threshold_data = np.zeros(self.chart_x_size)
+        self.intensity_upper_threshold_data = np.zeros(self.chart_x_size)
+        self.intensity_lower_threshold_data = np.zeros(self.chart_x_size)
         self.intensity_change_data = np.zeros(self.chart_x_size)
 
     def setup_ui(self, win_plot):
@@ -166,16 +168,21 @@ class UserInterface(object):
         self.beat_threshold_curve.setData(self.beat_threshold_data)
         self.beat_curve.setData(self.beat_data)
 
-    def update_intensity_plot(self, flux, threshold, is_change):
+    def update_intensity_plot(self, flux, threshold, upper_threshold, lower_threshold, is_change):
         self.intensity_flux_data = np.roll(self.intensity_flux_data, -1)
         self.intensity_flux_data[-1] = flux
         self.intensity_threshold_data = np.roll(self.intensity_threshold_data, -1)
         self.intensity_threshold_data[-1] = threshold
+        self.intensity_upper_threshold_data = np.roll(self.intensity_upper_threshold_data, -1)
+        self.intensity_upper_threshold_data[-1] = upper_threshold
+        self.intensity_lower_threshold_data = np.roll(self.intensity_lower_threshold_data, -1)
+        self.intensity_lower_threshold_data[-1] = lower_threshold
+
         self.intensity_change_data = np.roll(self.intensity_change_data, -1)
         self.intensity_change_data[-1] = self.intensity_chart_y_size*2 if is_change else 0
 
         self.intensity_flux_curve.setData(self.intensity_flux_data)
         self.intensity_threshold_curve.setData(self.intensity_threshold_data)
-        self.intensity_threshold_high_curve.setData(self.intensity_threshold_data * SpectralFluxIntensityDetector.UPPER_THRESHOLD_MULTIPLIER)
-        self.intensity_threshold_low_curve.setData(self.intensity_threshold_data * SpectralFluxIntensityDetector.LOWER_THRESHOLD_MULTIPLIER)
+        self.intensity_threshold_high_curve.setData(self.intensity_upper_threshold_data)
+        self.intensity_threshold_low_curve.setData(self.intensity_lower_threshold_data)
         self.intensity_change_curve.setData(self.intensity_change_data)

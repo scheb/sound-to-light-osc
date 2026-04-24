@@ -45,12 +45,18 @@ class VolumeNormalizer(QObject):
 
 class SpectralFluxIntensityDetector(QObject):
     intensity_changed = pyqtSignal(int)  # -1: Calm, 0: Normal, 1: Intense
-    spectral_flux_updated = pyqtSignal(float, float, bool)
+    spectral_flux_updated = pyqtSignal(float, float, float, float, bool)
     INTENSITY_NORMAL = 0
     INTENSITY_INTENSE = 1
     INTENSITY_CALM = -1
-    UPPER_THRESHOLD_MULTIPLIER = 1.3
-    LOWER_THRESHOLD_MULTIPLIER = 0.7
+
+    # Thresholds for entering states
+    ENTER_INTENSE_FACTOR = 1.3
+    ENTER_CALM_FACTOR = 0.7
+
+    # Thresholds for leaving states (Resistance/Hysteresis)
+    LEAVE_INTENSE_FACTOR = 1.1
+    LEAVE_CALM_FACTOR = 0.9
 
     def __init__(self, sample_length_secs):
         super().__init__()
@@ -100,32 +106,54 @@ class SpectralFluxIntensityDetector(QObject):
         avg_flux = numpy.median(self.flux_history)
         recent_flux = numpy.median(list(self.flux_history)[-self.flux_evaluation_frame:])
 
-        # Determine intensity relative to the moving average
-        detected_intensity = self.INTENSITY_NORMAL
-        if recent_flux > avg_flux * self.UPPER_THRESHOLD_MULTIPLIER:
-            detected_intensity = self.INTENSITY_INTENSE
-        elif recent_flux < avg_flux * self.LOWER_THRESHOLD_MULTIPLIER:
-            detected_intensity = self.INTENSITY_CALM
+        # Determine target intensity based on hysteresis rules
+        target_intensity = self.current_intensity
 
-        # Require stability before switching
+        if self.current_intensity == self.INTENSITY_INTENSE:
+            # Resistance: Must drop below a lower threshold to return to normal
+            upper_threshold = avg_flux * self.LEAVE_INTENSE_FACTOR
+            lower_threshold = avg_flux * self.ENTER_CALM_FACTOR
+            if recent_flux < lower_threshold:
+                target_intensity = self.INTENSITY_CALM
+            elif recent_flux < upper_threshold:
+                target_intensity = self.INTENSITY_NORMAL
+        
+        elif self.current_intensity == self.INTENSITY_CALM:
+            # Resistance: Must rise above a higher threshold to return to normal
+            upper_threshold = avg_flux * self.ENTER_INTENSE_FACTOR
+            lower_threshold = avg_flux * self.LEAVE_CALM_FACTOR
+            if recent_flux > upper_threshold:
+                target_intensity = self.INTENSITY_NORMAL
+            elif recent_flux > lower_threshold:
+                target_intensity = self.INTENSITY_NORMAL
+
+        else:
+            upper_threshold = avg_flux * self.ENTER_INTENSE_FACTOR
+            lower_threshold = avg_flux * self.ENTER_CALM_FACTOR
+            if recent_flux > upper_threshold:
+                target_intensity = self.INTENSITY_INTENSE
+            elif recent_flux < lower_threshold:
+                target_intensity = self.INTENSITY_CALM
+
+        # Require stability before switching (debounce)
         is_intensity_change = False
-        if detected_intensity != self.current_intensity:
-            if detected_intensity == self.pending_intensity:
+        if target_intensity != self.current_intensity:
+            if target_intensity == self.pending_intensity:
                 self.intensity_hold_counter += 1
             else:
-                self.pending_intensity = detected_intensity
+                self.pending_intensity = target_intensity
                 self.intensity_hold_counter = 0
 
             if self.intensity_hold_counter > 50:  # ~1 second stability
-                self.current_intensity = detected_intensity
-                self.intensity_changed.emit(detected_intensity)
+                self.current_intensity = target_intensity
+                self.intensity_changed.emit(self.current_intensity)
                 is_intensity_change = True
                 self.intensity_hold_counter = 0
         else:
             self.intensity_hold_counter = 0
             self.pending_intensity = None
 
-        self.spectral_flux_updated.emit(recent_flux, avg_flux, is_intensity_change)
+        self.spectral_flux_updated.emit(recent_flux, avg_flux, upper_threshold, lower_threshold, is_intensity_change)
 
 
 class BeatDetector(QObject):
