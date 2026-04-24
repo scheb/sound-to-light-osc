@@ -54,15 +54,33 @@ class SpectralFluxIntensityDetector(QObject):
 
     def __init__(self, sample_length_secs):
         super().__init__()
-        self.current_intensity = 0
+        self.prev_spectrum = None
+        self.current_intensity = None
         self.flux_history = deque(maxlen=int(60 / sample_length_secs))  # 60 seconds
         self.flux_min_history = int(5 / sample_length_secs) # 5secs min history
         self.flux_evaluation_frame = int(1 / sample_length_secs) # 1sec
-        self.prev_spectrum = None
+        self.is_paused = False
 
         # Stability logic
-        self.pending_intensity = 0
+        self.pending_intensity = self.INTENSITY_NORMAL
+        self.intensity_hold_counter = self.INTENSITY_NORMAL
+
+    def reset_state(self):
+        if self.current_intensity != self.INTENSITY_NORMAL:
+            self.intensity_changed.emit(self.INTENSITY_NORMAL)
+        self.prev_spectrum = None
+        self.current_intensity = self.INTENSITY_NORMAL
+        self.pending_intensity = self.INTENSITY_NORMAL
         self.intensity_hold_counter = 0
+
+    @pyqtSlot()
+    def on_pause_detected(self):
+        self.is_paused = True
+
+    @pyqtSlot()
+    def on_new_song_detected(self):
+        self.reset_state()
+        self.is_paused = False
 
     def update(self, xs, ys, current_time: float):
         # Calculate spectral flux for the whole spectrum
@@ -73,7 +91,8 @@ class SpectralFluxIntensityDetector(QObject):
         spectral_flux = numpy.sum(numpy.maximum(0, ys - self.prev_spectrum))
         self.prev_spectrum = ys
 
-        self.flux_history.append(spectral_flux)
+        if not self.is_paused:
+            self.flux_history.append(spectral_flux)
 
         if len(self.flux_history) < self.flux_min_history:
             return
@@ -129,6 +148,15 @@ class BeatDetector(QObject):
         self.dynamic_threshold_multiplier = 1.5
         # Constant floor added to the dynamic threshold. Prevents background noise from triggering beats during quiet sections.
         self.dynamic_threshold_offset = 200 # 1000max
+        self.is_paused = False # Flag to control history tracking
+
+    @pyqtSlot()
+    def on_pause_detected(self):
+        self.is_paused = True
+
+    @pyqtSlot()
+    def on_new_song_detected(self):
+        self.is_paused = False
 
     def update(self, xs, ys, current_time: float):
         """
@@ -151,7 +179,7 @@ class BeatDetector(QObject):
         self.prev_spectrum = bass_band
 
         # Ignore silence for history to maintain threshold while no song is playing
-        if spectral_flux > self.dynamic_threshold_offset:
+        if not self.is_paused:
             # Maintain a history of flux values for thresholding
             self.odf_history.append(spectral_flux)
 
@@ -211,6 +239,13 @@ class AudioAnalyzer(QObject):
         self.beat_detector = BeatDetector(sample_length_secs)
         self.intensity_detector = SpectralFluxIntensityDetector(sample_length_secs)
         self.new_song_detector = NewSongDetector()
+
+        # Connect signals for history management
+        self.new_song_detector.pause_detected.connect(self.beat_detector.on_pause_detected)
+        self.new_song_detector.new_song_detected.connect(self.beat_detector.on_new_song_detected)
+        self.new_song_detector.pause_detected.connect(self.intensity_detector.on_pause_detected)
+        self.new_song_detector.new_song_detected.connect(self.intensity_detector.on_new_song_detected)
+
 
     def analyze_audio(self):
         if not self.input_recorder.has_new_audio:
