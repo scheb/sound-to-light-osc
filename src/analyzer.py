@@ -13,7 +13,7 @@ class VolumeNormalizer(QObject):
     def __init__(self, sample_length_secs):
         super().__init__()
         self.raw_max_values = []
-        self.historic_max_values = deque(maxlen=int(60 / sample_length_secs)) # 60 seconds
+        self.historic_max_values = deque(maxlen=int(30 / sample_length_secs)) # 30 seconds
         self.target_max = MAX_VOLUME
         self.scale_factor = 1.0
 
@@ -135,6 +135,10 @@ class SpectralFluxIntensityDetector(QObject):
             elif recent_flux < lower_threshold:
                 target_intensity = self.INTENSITY_CALM
 
+        # After startup choose normal, if nothing else is detected
+        if target_intensity is None:
+            target_intensity = self.INTENSITY_NORMAL
+
         # Require stability before switching (debounce)
         is_intensity_change = False
         if target_intensity != self.current_intensity:
@@ -170,7 +174,7 @@ class BeatDetector(QObject):
         self.last_beat_time = 0.0
         self.beat_refractory_period = 0.333  # ~180bpm
         self.prev_spectrum = None
-        self.odf_history = deque(maxlen=int(60 / sample_length_secs))  # 60 seconds
+        self.odf_history = deque(maxlen=int(30 / sample_length_secs))  # 30 seconds
         self.odf_min_history_size = int(5 / sample_length_secs) # 5secs min history
         # Sensitivity multiplier for the dynamic threshold. Higher values make beat detection more restrictive (requires a stronger peak relative to the median).
         self.dynamic_threshold_multiplier = 1.5
