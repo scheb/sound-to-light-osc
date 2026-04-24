@@ -65,6 +65,11 @@ class UserInterface(object):
         self.intensity_threshold_low_curve = self.intensity_plot.plot(pen=pg.mkPen('#ffff0070', width=1))
         vertical_layout.addWidget(self.intensity_plot)
 
+        self.intensity_label = QtWidgets.QLabel(central_widget)
+        self.intensity_label.setObjectName("lbl_intensity")
+        self.intensity_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
+        vertical_layout.addWidget(self.intensity_label)
+
         input_widget = QtWidgets.QWidget(win_plot)
         vertical_layout_input = QtWidgets.QVBoxLayout(input_widget)
 
@@ -85,10 +90,7 @@ class UserInterface(object):
         self.auto_prog_button.clicked.connect(self.callback_auto_prog_clicked)
         vertical_layout.addWidget(self.auto_prog_button)
 
-        self.intensity_label = QtWidgets.QLabel(central_widget)
-        self.intensity_label.setObjectName("lbl_intensity")
-        self.intensity_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
-        vertical_layout.addWidget(self.intensity_label)
+
 
         self.bar_label = QtWidgets.QLabel(central_widget)
         self.bar_label.setObjectName("lbl_bar")
