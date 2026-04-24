@@ -17,7 +17,7 @@ class BeatDetector(QtCore.QObject):
         super().__init__()
         self.ui = ui.UserInterface(self.on_auto_prog_button_clicked, self.on_input_changed)
         self.ui.setup_ui(window)
-        self.osc_client = osc.OscClient("localhost", 7701)
+        self.osc_client = osc.OscClient("127.0.0.1", 7701)
         self.auto_prog = False
 
         self.input_recorder = InputRecorder(self, SAMPLE_LENGTH_SECS)
