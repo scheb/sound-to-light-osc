@@ -311,7 +311,10 @@ class SignalGenerator(QObject):
         self.last_beat_time = 0.0
         self.beat_refractory_period = 0.333  # ~180bpm
         self.beat_times = deque(maxlen=32)
+        self.beat_number = -1  # Zero-indexed
+        self.current_bpm = 0
         self.intensity = 0
+        self.beat_modulo = 4
         self.is_paused = False
 
         self.bpm_timer = QtCore.QTimer(self)
@@ -323,9 +326,31 @@ class SignalGenerator(QObject):
         self.is_paused = False
         # Refractory period skips too many beats close to another
         if (beat_time - self.last_beat_time) > self.beat_refractory_period:
-            self.beat_signal.emit(0)
+            beats_progressed = self.number_of_beats_since_last_beat(beat_time)
+            # print("Beat progress {:d}".format(beats_progressed))
+            if beats_progressed > 2:
+                # More than 2 beats missed, consider this a first beat
+                self.beat_number = 0
+            else:
+                self.beat_number += beats_progressed
+
+            self.beat_signal.emit(self.beat_number)
             self.last_beat_time = beat_time
             self.beat_times.append(beat_time)
+
+            # Depending on intensity, emit a bar every few beats
+            if self.beat_number % self.beat_modulo == 0:
+                self.bar_detected.emit()
+
+    def number_of_beats_since_last_beat(self, beat_time):
+        # Assume 1 beat step when there is no BPM or no previous beat time
+        if self.current_bpm <= 0 or self.last_beat_time == 0.0:
+            return 1
+
+        interval = 60.0 / self.current_bpm
+        # Account for early arrival by adding refractory period, no other beat can come in before that time
+        time_since_last_beat = (beat_time - self.last_beat_time) + (self.beat_refractory_period * 0.99)
+        return math.floor(time_since_last_beat / interval)
 
     @pyqtSlot()
     def track_new_song(self):
@@ -335,15 +360,24 @@ class SignalGenerator(QObject):
     @pyqtSlot()
     def track_pause(self):
         self.is_paused = True
+        self.beat_number = -1
         self.beat_times.clear()
         self.last_beat_time = 0.0
         self.pause_detected.emit()
-        self.bpm_changed.emit(0)
+        self.announce_bpm_change(0)
 
     @pyqtSlot(int)
     def track_intensity_change(self, intensity):
         self.is_paused = False
         self.intensity = intensity
+        self.beat_modulo = self.get_beat_modulo_for_intensity(intensity)
+
+    def get_beat_modulo_for_intensity(self, intensity):
+        if intensity == -1:
+            return 8  # Calm
+        if intensity == 1:
+            return 1  # Intense
+        return 4  # Normal
 
     def estimate_bpm(self):
         # Do not estimate during pause
@@ -389,4 +423,9 @@ class SignalGenerator(QObject):
                     best_bpm = bpm
         
         if best_bpm > 0:
-            self.bpm_changed.emit(best_bpm)
+            self.announce_bpm_change(best_bpm)
+
+    def announce_bpm_change(self, bpm):
+        self.current_bpm = bpm
+        self.bpm_changed.emit(bpm)
+
