@@ -171,8 +171,6 @@ class SpectralFluxBeatDetector(QObject):
     def __init__(self, sample_length_secs):
         super().__init__()
         self.sample_length_secs = sample_length_secs
-        self.last_beat_time = 0.0
-        self.beat_refractory_period = 0.333  # ~180bpm
         self.prev_spectrum = None
         self.odf_history = deque(maxlen=int(30 / sample_length_secs))  # 30 seconds
         self.odf_min_history_size = int(5 / sample_length_secs) # 5secs min history
@@ -225,14 +223,8 @@ class SpectralFluxBeatDetector(QObject):
 
         # A beat is detected if flux exceeds the threshold
         is_beat = spectral_flux > dynamic_threshold
-
         if is_beat:
-            # Refractory period skips too many beats close to another
-            if (current_time - self.last_beat_time) > self.beat_refractory_period:
-                self.beat_detected.emit(current_time)
-                self.last_beat_time = current_time
-            else:
-                is_beat = False
+            self.beat_detected.emit(current_time)
 
         self.spectral_flux_updated.emit(spectral_flux, dynamic_threshold, is_beat)
 
@@ -315,10 +307,15 @@ class SignalGenerator(QObject):
 
     def __init__(self) -> None:
         super().__init__()
+        self.last_beat_time = 0.0
+        self.beat_refractory_period = 0.333  # ~180bpm
 
     @pyqtSlot(float)
     def track_beat(self, beat_time):
-        self.beat_signal.emit(0)
+        # Refractory period skips too many beats close to another
+        if (beat_time - self.last_beat_time) > self.beat_refractory_period:
+            self.beat_signal.emit(0)
+            self.last_beat_time = beat_time
 
     @pyqtSlot()
     def track_new_song(self):
