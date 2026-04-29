@@ -355,6 +355,8 @@ class SignalGenerator(QObject):
     @pyqtSlot()
     def track_new_song(self):
         self.is_paused = False
+        self.beat_times.clear()
+        self.last_beat_time = 0.0
         self.new_song_detected.emit()
 
     @pyqtSlot()
@@ -395,32 +397,35 @@ class SignalGenerator(QObject):
         t_max = normalized_beats[-1]
 
         best_bpm = 0
-        min_diff = float('inf')
-        min_missed = float('inf')
+        min_total_cost = float('inf') # This will now combine timing difference and missed beat penalty
 
         for bpm in range(60, 181):
             interval = 60.0 / bpm
-            total_diff = 0
-            matched_indices = set()
+            current_timing_diff = 0
+            matched_expected_beat_indices = set()
             
             for b in normalized_beats:
                 k = round(b / interval)
-                total_diff += abs(b - k * interval)
-                matched_indices.add(k)
+                current_timing_diff += abs(b - k * interval)
+                matched_expected_beat_indices.add(k)
             
-            # Number of expected beats in the duration
-            expected_count = round(t_max / interval) + 1
-            missed_beats = max(0, expected_count - len(matched_indices))
+            # Calculate missed beats
+            # The expected beat indices are 0, 1, 2, ..., expected_max_k
+            expected_max_k = round(t_max / interval)
+            
+            # Create a set of all expected beat indices up to the last observed beat time
+            all_expected_beat_indices = set(range(expected_max_k + 1))
 
-            # Primary: min_diff, Secondary: min_missed
-            if total_diff < min_diff:
-                min_diff = total_diff
-                min_missed = missed_beats
+            # Missed beats are those expected indices that were not matched
+            missed_beats_count = len(all_expected_beat_indices - matched_expected_beat_indices)
+
+            # Calculate the total cost: timing differences + penalty for missed beats
+            current_total_cost = current_timing_diff + (missed_beats_count * interval)
+
+            # Compare with the minimum total cost found so far
+            if current_total_cost < min_total_cost:
+                min_total_cost = current_total_cost
                 best_bpm = bpm
-            elif abs(total_diff - min_diff) < 1e-7:
-                if missed_beats < min_missed:
-                    min_missed = missed_beats
-                    best_bpm = bpm
         
         if best_bpm > 0:
             self.announce_bpm_change(best_bpm)
@@ -428,4 +433,3 @@ class SignalGenerator(QObject):
     def announce_bpm_change(self, bpm):
         self.current_bpm = bpm
         self.bpm_changed.emit(bpm)
-
