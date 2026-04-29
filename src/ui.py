@@ -53,6 +53,11 @@ class UserInterface(object):
         self.beat_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
         vertical_layout.addWidget(self.beat_label)
 
+        self.bar_label = QtWidgets.QLabel(central_widget)
+        self.bar_label.setObjectName("lbl_bar")
+        self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
+        vertical_layout.addWidget(self.bar_label)
+
         # Plot Widget for Intensity Visualization
         self.intensity_plot = pg.PlotWidget(central_widget)
         self.intensity_plot.setBackground('k')
@@ -91,11 +96,6 @@ class UserInterface(object):
         self.auto_prog_button.setStyleSheet("background-color: red; font-size: 18pt")
         self.auto_prog_button.clicked.connect(self.callback_auto_prog_clicked)
         vertical_layout.addWidget(self.auto_prog_button)
-
-        self.bar_label = QtWidgets.QLabel(central_widget)
-        self.bar_label.setObjectName("lbl_bar")
-        self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")
-        vertical_layout.addWidget(self.bar_label)
 
         win_plot.setCentralWidget(central_widget)
         self.translate_ui(win_plot)
