@@ -92,8 +92,6 @@ class UserInterface(object):
         self.auto_prog_button.clicked.connect(self.callback_auto_prog_clicked)
         vertical_layout.addWidget(self.auto_prog_button)
 
-
-
         self.bar_label = QtWidgets.QLabel(central_widget)
         self.bar_label.setObjectName("lbl_bar")
         self.bar_label.setStyleSheet("padding: 5px; qproperty-alignment: AlignCenter; background-color: #a9a9a9; font-size: 18pt")

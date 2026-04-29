@@ -54,11 +54,11 @@ class BeatDetector(QtCore.QObject):
         # Connect signal generator to UI and OSC
         self.signal_generator.beat_signal.connect(self.on_beat)
         self.signal_generator.bar_detected.connect(self.on_bar)
-        self.signal_generator.bpm_changed.connect(self.on_bpm_change)
 
         # Connect new song detector to UI
-        self.audio_analyzer.new_song_detector.new_song_detected.connect(self.on_new_song)
-        self.audio_analyzer.new_song_detector.pause_detected.connect(self.on_pause)
+        self.signal_generator.new_song_detected.connect(self.on_new_song)
+        self.signal_generator.pause_detected.connect(self.on_pause)
+        self.signal_generator.bpm_changed.connect(self.on_bpm_change)
 
         # Connect intensity directly to the UI
         self.audio_analyzer.intensity_detector.intensity_changed.connect(self.on_intensity_change)

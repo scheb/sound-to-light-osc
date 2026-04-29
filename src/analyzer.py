@@ -304,6 +304,7 @@ class SignalGenerator(QObject):
     beat_signal = pyqtSignal(int)
     bar_detected = pyqtSignal()
     new_song_detected = pyqtSignal()
+    pause_detected = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -323,7 +324,7 @@ class SignalGenerator(QObject):
 
     @pyqtSlot()
     def track_pause(self):
-        pass
+        self.pause_detected.emit()
 
     @pyqtSlot(int)
     def track_intensity_change(self, intensity):
