@@ -106,7 +106,7 @@ class UserInterface(object):
         self.auto_prog_button.setText(QtWidgets.QApplication.translate("win_plot", "Auto Prog OFF", None))
         self.intensity_label.setText(QtWidgets.QApplication.translate("win_plot", "Intensity", None))
         self.beat_label.setText(QtWidgets.QApplication.translate("win_plot", "Beat", None))
-        self.bar_label.setText(QtWidgets.QApplication.translate("win_plot", "BPM", None))
+        self.bar_label.setText(QtWidgets.QApplication.translate("win_plot", "BPM: Estimating", None))
         self.input_label.setText(QtWidgets.QApplication.translate("win_plot", "Audio Source", None))
 
     def change_auto_prog_state(self, enabled):
@@ -140,7 +140,10 @@ class UserInterface(object):
         self.beat_label.setText("Beat: {:d}".format(beat_index))
 
     def display_bpm(self, bpm):
-        self.bar_label.setText("BPM: {:d}".format(int(bpm)))
+        if bpm > 0:
+            self.bar_label.setText("BPM: {:d}".format(int(bpm)))
+        else:
+            self.bar_label.setText("BPM: Estimating")
 
     def display_new_song(self):
         self.beat_label.setText("Beat: New song")

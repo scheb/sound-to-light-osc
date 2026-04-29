@@ -310,22 +310,83 @@ class SignalGenerator(QObject):
         super().__init__()
         self.last_beat_time = 0.0
         self.beat_refractory_period = 0.333  # ~180bpm
+        self.beat_times = deque(maxlen=32)
+        self.intensity = 0
+        self.is_paused = False
+
+        self.bpm_timer = QtCore.QTimer(self)
+        self.bpm_timer.timeout.connect(self.estimate_bpm)
+        self.bpm_timer.start(4000) # Every 4 seconds
 
     @pyqtSlot(float)
     def track_beat(self, beat_time):
+        self.is_paused = False
         # Refractory period skips too many beats close to another
         if (beat_time - self.last_beat_time) > self.beat_refractory_period:
             self.beat_signal.emit(0)
             self.last_beat_time = beat_time
+            self.beat_times.append(beat_time)
 
     @pyqtSlot()
     def track_new_song(self):
+        self.is_paused = False
         self.new_song_detected.emit()
 
     @pyqtSlot()
     def track_pause(self):
+        self.is_paused = True
+        self.beat_times.clear()
+        self.last_beat_time = 0.0
         self.pause_detected.emit()
+        self.bpm_changed.emit(0)
 
     @pyqtSlot(int)
     def track_intensity_change(self, intensity):
+        self.is_paused = False
         self.intensity = intensity
+
+    def estimate_bpm(self):
+        # Do not estimate during pause
+        if self.is_paused:
+            return
+
+        # Minimum beats needed to start estimating
+        if len(self.beat_times) < 4:
+            return
+
+        beats = list(self.beat_times)
+        t0 = beats[0]
+        # Normalize so first beat is at 0
+        normalized_beats = [b - t0 for b in beats]
+        t_max = normalized_beats[-1]
+
+        best_bpm = 0
+        min_diff = float('inf')
+        min_missed = float('inf')
+
+        for bpm in range(60, 181):
+            interval = 60.0 / bpm
+            total_diff = 0
+            matched_indices = set()
+            
+            for b in normalized_beats:
+                k = round(b / interval)
+                total_diff += abs(b - k * interval)
+                matched_indices.add(k)
+            
+            # Number of expected beats in the duration
+            expected_count = round(t_max / interval) + 1
+            missed_beats = max(0, expected_count - len(matched_indices))
+
+            # Primary: min_diff, Secondary: min_missed
+            if total_diff < min_diff:
+                min_diff = total_diff
+                min_missed = missed_beats
+                best_bpm = bpm
+            elif abs(total_diff - min_diff) < 1e-7:
+                if missed_beats < min_missed:
+                    min_missed = missed_beats
+                    best_bpm = bpm
+        
+        if best_bpm > 0:
+            self.bpm_changed.emit(best_bpm)
