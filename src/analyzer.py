@@ -160,9 +160,9 @@ class SpectralFluxIntensityDetector(QObject):
         self.spectral_flux_updated.emit(recent_flux, avg_flux, upper_threshold, lower_threshold, is_intensity_change)
 
 
-class BeatDetector(QObject):
+class SpectralFluxBeatDetector(QObject):
     """
-    Analyzes frequency spectrum data to detect beats and estimate BPM.
+    Analyzes frequency spectrum data to detect beats.
     Uses spectral flux (Onset Detection Function) to identify rhythmic peaks.
     """
     beat_detected = pyqtSignal(float)
@@ -268,7 +268,7 @@ class AudioAnalyzer(QObject):
         super().__init__()
         self.input_recorder = input_recorder
         self.volume_normalizer = VolumeNormalizer(sample_length_secs)
-        self.beat_detector = BeatDetector(sample_length_secs)
+        self.beat_detector = SpectralFluxBeatDetector(sample_length_secs)
         self.intensity_detector = SpectralFluxIntensityDetector(sample_length_secs)
         self.new_song_detector = NewSongDetector()
 
