@@ -1,5 +1,5 @@
-sound-to-light-osc
-==================
+sound-to-light-osc (2.x)
+========================
 
 Real-time detection of beats with Python from an audio input device (typically "Stereo Mix"). Outputs OSC signals,
 to be used for sound-to-light control.
@@ -16,24 +16,51 @@ Required modules
 - Python 3.8+
 - PyAudio
 - PyQt5
-- PyQwt
-- matplotlib
 - scipy
 - python-osc
+
+Install dependencies from `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
 
 Usage
 -----
 
-`python beat_detector.py`
+`python src\beat_detector.py`
 
 OSC Signals
 -----------
 
-OSC signals are sent to `localhost:7701`, can be changed in `beat_detector.py`.
+OSC signals are sent to `127.0.0.1:7701`, which can be changed in `src/beat_detector.py`.
 
 - `/beat` is sent for every beat detected.
-- `/bar` is sent every to change the lighting scene.
-- `/prog1` - `/prog8` is sent to change lighting programs (available have to be configured in `beat_detector.py`)
+- `/bar` is sent to change the lighting scene.
+- `/prog1` - `/prog8` is sent to change lighting programs (available have to be configured in `src/beat_detector.py`)
+
+Technical Overview
+------------------
+
+The application is structured into several key components:
+
+* `recorder.py`: Handles audio input from the system's default audio device, providing raw audio data and frequency
+   spectrum (FFT) data for analysis.
+* `analyzer.py`: Contains the core audio processing and detection logic:
+  * `VolumeNormalizer`: Continuously normalizes the incoming audio volume to a target level.
+  * `SpectralFluxBeatDetector`: Detects beats by analyzing the spectral flux in the low-frequency band.
+  * `SpectralFluxIntensityDetector`: Determines the overall music intensity (Calm, Normal, Intense) by analyzing the
+     spectral flux across the full frequency band. It uses hysteresis to prevent rapid state changes.
+  * `NewSongDetector`: Identifies periods of silence to detect pauses and new song beginnings.
+  * `AudioAnalyzer`: Orchestrates the various detectors, feeding them processed audio data.
+  * `SignalGenerator`: Estimates BPM based on detected beats, tracks beat numbers, and generates the "bar" signals.
+* `ui.py`: Implements the graphical user interface using PyQt5, providing real-time visualizations of spectral flux,
+  beat and intensity thresholds, current BPM, and program status.
+* `osc.py`: Manages the sending of Open Sound Control (OSC) messages to a specified IP address and port (default: `127.0.0.1:7701`).
+* `beat_detector.py`: The main entry point of the application, integrating all components. It sets up the UI, audio
+  recording, analysis, and OSC client. It also contains the logic for automatic program switching based on detected
+  intensity and beat patterns.
+
 
 Contributing
 ------------
@@ -55,6 +82,16 @@ Based on [shunfu/python-beat-detector](https://github.com/shunfu/python-beat-det
 
 Version History
 ---------------
+
+### 2.0
+
+- Fundamental rewrite for improved performance and accuracy.
+- Audio analysis now runs every `0.02` seconds (50 times per second) for more responsive detection.
+- Dynamic volume normalization ensures consistent detection regardless of input audio level.
+- Uses spectral flux in the bass frequencies for beat tracking.
+- Determines music intensity (Calm, Normal, Intense) by analyzing spectral flux across the entire frequency spectrum. 
+  Applies hysteresis for stable state changes.
+- New graphical interface to visualize beat and intensity detection, thresholds, and current BPM.
 
 ### 1.0
 
