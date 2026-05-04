@@ -1,5 +1,5 @@
-sound-to-light-osc
-==================
+sound-to-light-osc (1.x)
+========================
 
 Real-time detection of beats with Python from an audio input device (typically "Stereo Mix"). Outputs OSC signals,
 to be used for sound-to-light control.
